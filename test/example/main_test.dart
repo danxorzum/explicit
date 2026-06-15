@@ -1,6 +1,6 @@
-// Mirrors the scenarios in `example/main.dart` in Table-Driven Test Cases
-// (TCT) style. The example is a runnable demo; these tests prove that the
-// same library calls produce the documented outcomes.
+// Mirrors the scenarios in the Very Good CLI example app in Table-Driven Test
+// Cases (TCT) style. The example is a runnable demo; these tests prove that
+// the same library calls produce the documented outcomes.
 // ignore_for_file: deprecated_member_use_from_same_package
 
 import 'package:explicit/explicit.dart';
@@ -72,7 +72,7 @@ typedef _PingCase = ({
 
 void main() {
   // ---------------------------------------------------------------
-  // 1. Success and failure (mirrors `example/main.dart` section 1)
+  // 1. Success and failure (mirrors example app section 1)
   // ---------------------------------------------------------------
   group('example: success and failure', () {
     final testCases = <_DivideCase>[

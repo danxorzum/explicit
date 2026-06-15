@@ -1,5 +1,4 @@
-// Deprecated aliases are the behavior under test in this file.
-// ignore_for_file: deprecated_member_use_from_same_package
+// Compatibility aliases are the behavior under test in this file.
 
 import 'package:explicit/explicit.dart';
 import 'package:test/test.dart';
@@ -13,7 +12,7 @@ typedef _TestCase<T, E> = ({
 });
 
 void main() {
-  group('deprecated compatibility aliases', () {
+  group('compatibility aliases', () {
     final testCases = <_TestCase<int, String>>[
       (
         name: 'Success constructs an Ok-compatible success result',

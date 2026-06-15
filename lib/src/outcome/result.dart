@@ -6,10 +6,10 @@ typedef AsyncResult<T, E> = Future<Result<T, E>>;
 /// Compact alias for [Result].
 typedef Res<T, E> = Result<T, E>;
 
-/// Deprecated compatibility alias for [Ok].
+/// Compatibility alias for [Ok].
 typedef Success<T, E> = Ok<T, E>;
 
-/// Deprecated compatibility alias for [Err].
+/// Compatibility alias for [Err].
 typedef Failure<T, E> = Err<T, E>;
 
 /// {@template result}

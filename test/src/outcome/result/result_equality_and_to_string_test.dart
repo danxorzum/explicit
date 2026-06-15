@@ -119,4 +119,72 @@ void main() {
       expect(negative.hashCode, isA<int>());
     });
   });
+
+  group('Err equality', () {
+    final testCases = <_EqualityCase<int, String>>[
+      (
+        name: 'two Err with the same error are equal',
+        left: const Err<int, String>('boom'),
+        right: const Err<int, String>('boom'),
+        expected: true,
+      ),
+      (
+        name: 'two Err with different errors are not equal',
+        left: const Err<int, String>('boom'),
+        right: const Err<int, String>('other'),
+        expected: false,
+      ),
+      (
+        name: 'Err with empty error and Err with empty error are equal',
+        left: const Err<int, String>(''),
+        right: const Err<int, String>(''),
+        expected: true,
+      ),
+      (
+        name: 'Err and Ok with the same payload are not equal',
+        left: const Err<int, String>('1'),
+        right: const Ok<int, String>(1),
+        expected: false,
+      ),
+    ];
+
+    for (final tc in testCases) {
+      test(tc.name, () {
+        expect(tc.left == tc.right, tc.expected);
+      });
+    }
+
+    test('Err is equal to itself (identical)', () {
+      const err = Err<int, String>('boom');
+      expect(identical(err, err), isTrue);
+      expect(err == err, isTrue);
+    });
+
+    test('Err is not equal to a non-Err object', () {
+      const err = Err<int, String>('boom');
+      const Object notAResult = 'boom';
+      const Object notAResultInt = 1;
+      expect(err == notAResult, isFalse);
+      expect(err == notAResultInt, isFalse);
+    });
+  });
+
+  group('Err hashCode', () {
+    test('equal Err instances produce the same hashCode', () {
+      const a = Err<int, String>('boom');
+      const b = Err<int, String>('boom');
+      expect(a == b, isTrue);
+      expect(a.hashCode, b.hashCode);
+    });
+
+    test(
+      'Err hashCode runs without throwing for empty and non-empty errors',
+      () {
+        const empty = Err<int, String>('');
+        const nonEmpty = Err<int, String>('boom');
+        expect(empty.hashCode, isA<int>());
+        expect(nonEmpty.hashCode, isA<int>());
+      },
+    );
+  });
 }

@@ -56,7 +56,7 @@ short-circuiting.
 | Record access       | `toRecord` (deprecated)                                  | Kept for compatibility; prefer `fold` for new code.                   |
 | Lazy async          | `AsyncRes<T, E>` with `run`, `map`, `flatMap`, `andThen` | Work does not start until `run()` is called.                          |
 | Retry               | `retry(operation, maxAttempts: 3)`                       | Standalone function; throws `ArgumentError` for `maxAttempts <= 0`.   |
-| Compatibility       | `Success<T, E>`, `Failure<T, E>` (deprecated)            | Typedefs for `Ok` and `Err` to ease migration.                        |
+| Compatibility       | `Success<T, E>`, `Failure<T, E>`                         | Typedef aliases for `Ok` and `Err` to ease migration.                 |
 
 ## Usage
 
@@ -208,19 +208,26 @@ result.when(
 | `Result.expect`                     | method       | Returns the value or throws `StateError`.                                         |
 | `Result.expectError`                | method       | Returns the error or throws `StateError`.                                         |
 | `Result.toRecord` (deprecated)      | method       | Record representation `(T?, E?)`.                                                 |
-| `Success<T, E>` (deprecated)        | typedef      | Alias for `Ok`.                                                                   |
-| `Failure<T, E>` (deprecated)        | typedef      | Alias for `Err`.                                                                  |
+| `Success<T, E>`                     | typedef      | Compatibility alias for `Ok`.                                                     |
+| `Failure<T, E>`                     | typedef      | Compatibility alias for `Err`.                                                    |
 | `AsyncRes<T, E>`                    | class        | Lazy async pipeline. `run`, `map`, `flatMap`, `andThen`.                          |
 | `retry<T, E>`                       | function     | Repeat an async operation up to `maxAttempts`.                                    |
 
 ## Example
 
-A runnable console demo lives in [`example/main.dart`](example/main.dart). It
-walks through success, failure, `flatMap`/`andThen`, `toRecord`, the lazy
-`AsyncRes` pipeline, and the `retry` utility. Run it from the package root:
+A runnable Very Good CLI Dart app lives in [`example/`](example/). It has its
+own `pubspec.yaml` with a path dependency back to this package and uses the VGV
+Dart CLI layout at
+[`example/bin/explicit_example.dart`](example/bin/explicit_example.dart).
+
+The app walks through success, failure, `flatMap`/`andThen`, `toRecord`, the
+lazy `AsyncRes` pipeline, `AsyncRes` with `retry`, and awaited async
+composition. Run it from the example directory:
 
 ```sh
-dart run example/main.dart
+cd example
+dart pub get
+dart run
 ```
 
 ## Testing and coverage
@@ -238,7 +245,7 @@ dart run coverage:format_coverage \
 ```
 
 Line coverage for `lib/src/outcome/*.dart` and `lib/src/utils/*.dart` is
-**100%** (61/61 lines) as enforced by the SDD testing slice.
+**100%** (75/75 lines) as enforced by the SDD testing slice.
 
 ## Continuous Integration
 
