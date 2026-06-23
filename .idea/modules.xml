@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+<module fileurl="file://$PROJECT_DIR$/packages/explicit/melos_explicit.iml" filepath="$PROJECT_DIR$/packages/explicit/melos_explicit.iml"/>
+<module fileurl="file://$PROJECT_DIR$/packages/explicit_outcome/melos_explicit_outcome.iml" filepath="$PROJECT_DIR$/packages/explicit_outcome/melos_explicit_outcome.iml"/>
+<module fileurl="file://$PROJECT_DIR$/melos_workspace.iml" filepath="$PROJECT_DIR$/melos_workspace.iml"/>
+    </modules>
+  </component>
+</project>
