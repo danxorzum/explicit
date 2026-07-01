@@ -1,18 +1,21 @@
 import 'package:meta/meta.dart';
 
-/// Alias for an asynchronous [Option].
-typedef AsyncOption<T> = Future<Option<T>>;
-
 /// Compact alias for [Option].
-typedef Opt<T> = Option<T>;
+///
+/// ## Option
+/// {@macro option}
+typedef Opt<T extends Object> = Option<T>;
 
 /// {@template option}
 /// A generic [Option] type that represents either a [Val] value or a [Nil]
 /// (absence of value).
 ///
-/// Use [Option] to handle operations that can fail by returning no value
-/// without throwing exceptions.
-/// - [T] is the type of the success value.
+/// Use [Option] to make presence and absence explicit without throwing
+/// exceptions or hiding absence behind `null`.
+/// - [Val] means a value is present.
+/// - [Nil] means no value is present.
+/// - [T] is non-nullable; [Val] cannot wrap `null`. Use [Nil] to represent
+///   absence.
 ///
 /// ### Example:
 /// ```dart
@@ -23,10 +26,7 @@ typedef Opt<T> = Option<T>;
 ///   onNil: () => print('No value'),
 /// );
 ///
-/// option.next(
-///  onVal: (value) =>  Val(value * 2),
-///  onNil: () => Nil(),
-/// );
+/// final doubled = option.next((value) => Val(value * 2));
 ///
 /// switch (option) {
 ///   case Val<int>(:final value):
@@ -37,13 +37,13 @@ typedef Opt<T> = Option<T>;
 /// ```
 /// {@endtemplate}
 @immutable
-sealed class Option<T> {
+sealed class Option<T extends Object> {
   const Option();
 
-  /// Executes [onVal] if the result is an [Val], or [onNil] if it is
+  /// Executes [onVal] if this is an [Val], or [onNil] if it is
   /// a [Nil].
   ///
-  /// Returns the result of the executed function.
+  /// Returns the value produced by the executed function.
   R fold<R>({
     required R Function(T) onVal,
     required R Function() onNil,
@@ -57,16 +57,15 @@ sealed class Option<T> {
 
   /// Returns the value if this is an [Val].
   ///
-  /// If this is a [Nil], the [fallback] function is called with the error
-  /// value to determine the result.
+  /// If this is a [Nil], the [fallback] function is called to provide a value.
   T getOrElse(T Function() fallback) {
     return fold(
-      onVal: (result) => result,
+      onVal: (value) => value,
       onNil: () => fallback(),
     );
   }
 
-  /// Executes [onVal] if the result is an [Val], or [onNil] if it is
+  /// Executes [onVal] if this is an [Val], or [onNil] if it is
   /// a [Nil].
   void when({
     required void Function(T) onVal,
@@ -75,31 +74,36 @@ sealed class Option<T> {
     fold(onVal: onVal, onNil: onNil);
   }
 
-  /// Transforms the success value using [fn].
-  Opt<R> map<R>(R Function(T) fn) {
+  /// Transforms the present value using [fn].
+  Opt<R> map<R extends Object>(R Function(T) fn) {
     return fold(
       onVal: (value) => Val(fn(value)),
       onNil: Nil<R>.new,
     );
   }
 
-  /// Chains another [Option] operation when this result is [Val].
+  /// Chains another [Option] operation when this option is [Val].
   ///
-  /// If this result is [Nil], the error is propagated and [fn] is not called.
-  Opt<R> next<R>(Opt<R> Function(T) fn) {
+  /// If this option is [Nil], [fn] is not called.
+  Opt<R> next<R extends Object>(Opt<R> Function(T) fn) {
     return fold(
       onVal: fn,
       onNil: Nil<R>.new,
     );
   }
+
+  /// Chains another [Option] operation when this option is [Nil].
+  ///
+  /// If this option is [Val], [fn] is not called.
+  Opt<T> or(Opt<T> Function() fn) => fold(onVal: Val.new, onNil: fn);
 }
 
-/// A [Option] representing a successful operation.
-final class Val<T> extends Opt<T> {
+/// An [Option] representing a present, non-null value.
+final class Val<T extends Object> extends Opt<T> {
   /// Creates an [Val] with the given [value].
   const Val(this.value);
 
-  /// The successful value.
+  /// The present value.
   final T value;
 
   @override
@@ -126,8 +130,8 @@ final class Val<T> extends Opt<T> {
   int get hashCode => Object.hash(Val, T, value);
 }
 
-/// A [Option] representing a failed operation.
-final class Nil<T> extends Opt<T> {
+/// An [Option] representing absence of a value.
+final class Nil<T extends Object> extends Opt<T> {
   /// Creates an [Nil].
   const Nil();
 
