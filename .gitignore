@@ -8,3 +8,10 @@ pubspec.lock
 
 # Test related
 coverage/
+
+# IDE / local workspace
+.idea/
+*.iml
+
+# SDD artifacts
+.atl/
