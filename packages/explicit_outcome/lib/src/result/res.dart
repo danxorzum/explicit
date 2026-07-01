@@ -1,22 +1,25 @@
 import 'package:meta/meta.dart';
 
-/// Alias for an asynchronous [Result].
-typedef AsyncResult<T, E> = Future<Result<T, E>>;
-
 /// Compact alias for [Result].
-typedef Res<T, E> = Result<T, E>;
+///
+/// ## Result
+/// {@macro result}
+typedef Res<T extends Object, E extends Object> = Result<T, E>;
 
 /// Compatibility alias for [Ok].
-typedef Success<T, E> = Ok<T, E>;
+typedef Success<T extends Object, E extends Object> = Ok<T, E>;
 
 /// Compatibility alias for [Err].
-typedef Failure<T, E> = Err<T, E>;
+typedef Failure<T extends Object, E extends Object> = Err<T, E>;
 
 /// {@template result}
-/// A generic [Result] type that represents either an [Ok] or an [Err]
-/// (failure).
+/// A generic [Result] type that represents either an [Ok] success or an [Err]
+/// error.
 ///
-/// Use [Result] to handle operations that can fail without throwing exceptions.
+/// Use [Result] to make success and error states explicit without throwing
+/// exceptions for expected failures.
+/// - [Ok] means a success value is present.
+/// - [Err] means an error value is present.
 /// - [T] is the type of the success value.
 /// - [E] is the type of the error value.
 ///
@@ -29,6 +32,8 @@ typedef Failure<T, E> = Err<T, E>;
 ///   onError: (error) => print('Error: $error'),
 /// );
 ///
+/// final doubled = result.next((value) => Ok<int, String>(value * 2));
+///
 /// switch (result) {
 ///   case Ok<int, String>(:final value):
 ///     print('Success: $value');
@@ -38,11 +43,11 @@ typedef Failure<T, E> = Err<T, E>;
 /// ```
 /// {@endtemplate}
 @immutable
-sealed class Result<T, E> {
+sealed class Result<T extends Object, E extends Object> {
   const Result();
 
-  /// Executes [onSuccess] if the result is an [Ok], or [onError] if it is
-  /// an [Err].
+  /// Executes [onSuccess] if this is an [Ok], or [onError] if this is an
+  /// [Err].
   ///
   /// Returns the result of the executed function.
   R fold<R>({
@@ -56,73 +61,19 @@ sealed class Result<T, E> {
   /// Returns `true` if this is an [Err].
   bool get isFailure => fold(onSuccess: (_) => false, onError: (_) => true);
 
-  /// Note: This is an experimental API and may change or be removed in the
-  /// future.
-  /// Returns a record with (value, error).
-  /// - If it is [Ok], error will be null.
-  /// - If it is [Err], value will be null.
-  ///
-  /// Null values are allowed, so you can have an [Ok] with a null value or an
-  /// [Err] with a null error. Always check [isSuccess] or [isFailure] before
-  /// using the values.
-  @experimental
-  (T? value, E? error) get values => toRecord();
-
-  /// Returns a record with (value, error).
-  ///
-  /// - If it is [Ok], error will be null.
-  /// - If it is [Err], value will be null.
-  ///
-  /// Null values are allowed, so check [isSuccess] or [isFailure] before using
-  /// nullable payloads.
-  (T? value, E? error) toRecord() => fold(
-    onSuccess: (v) => (v, null),
-    onError: (e) => (null, e),
-  );
-
   /// Returns the value if this is an [Ok].
   ///
-  /// Throws [StateError] if this is an [Err].
-  /// Use this method only when you are sure the result is a success.
-  @experimental
-  @visibleForTesting
-  T expect() => fold(
-    onSuccess: (v) => v,
-    onError: (_) => throw StateError(
-      'Result.expect() was called on an error result.',
-    ),
-  );
-
-  /// Returns the error value if this is an [Err].
-  ///
-  /// Throws [StateError] if this is an [Ok].
-  /// Use this method only when you are sure the result is a failure.
-  @experimental
-  @visibleForTesting
-  E expectError() => fold(
-    onSuccess: (_) => throw StateError(
-      'Result.expectError() was called on a success result.',
-    ),
-    onError: (e) => e,
-  );
-
-  /// Returns the value if this is an [Ok].
-  ///
-  /// If this is an error result, the [orElse] function is called with the error
-  /// value to determine the result.
-  T getOrElse(T Function(E) orElse) {
+  /// If this is an [Err], the [fallback] function is called with the error
+  /// value to provide a value.
+  T getOrElse(T Function(E) fallback) {
     return fold(
-      onSuccess: (result) {
-        return result;
-      },
-      onError: (err) {
-        return orElse(err);
-      },
+      onSuccess: (value) => value,
+      onError: fallback,
     );
   }
 
-  /// Executes [onSuccess] if the result is an [Ok], or [onError] if it is
-  /// an [Err].
+  /// Executes [onSuccess] if this is an [Ok], or [onError] if this is an
+  /// [Err].
   void when({
     required void Function(T) onSuccess,
     required void Function(E) onError,
@@ -135,8 +86,8 @@ sealed class Result<T, E> {
 
   /// Transforms the success value using [fn].
   ///
-  /// If the result is [Err], the error is propagated.
-  Result<R, E> map<R>(R Function(T) fn) {
+  /// If this is an [Err], the error is propagated.
+  Res<R, E> map<R extends Object>(R Function(T) fn) {
     return fold(
       onSuccess: (value) => Ok(fn(value)),
       onError: Err.new,
@@ -145,30 +96,38 @@ sealed class Result<T, E> {
 
   /// Chains another [Result] operation when this result is [Ok].
   ///
-  /// If this result is [Err], the error is propagated and [fn] is not called.
-  Result<R, E> flatMap<R>(Result<R, E> Function(T) fn) {
+  /// If this is an [Err], the error is propagated and [fn] is not called.
+  Res<R, E> next<R extends Object>(Res<R, E> Function(T) fn) {
     return fold(
       onSuccess: fn,
       onError: Err.new,
     );
   }
 
-  /// Alias for [flatMap].
-  Result<R, E> andThen<R>(Result<R, E> Function(T) fn) => flatMap(fn);
-
   /// Transforms the error value using [fn].
   ///
-  /// If the result is [Ok], the value is propagated.
-  Result<T, R> mapError<R>(R Function(E) fn) {
+  /// If this is an [Ok], the value is propagated.
+  Res<T, R> mapError<R extends Object>(R Function(E) fn) {
     return fold(
       onSuccess: Ok.new,
       onError: (error) => Err(fn(error)),
     );
   }
+
+  /// Returns this result if it is [Ok], or calls [fn] with the error.
+  ///
+  /// If this is an [Ok], the success value is preserved and [fn] is not called.
+  /// If this is an [Err], [fn] receives the error and its result is returned.
+  Res<T, E> or(Res<T, E> Function(E error) fn) {
+    return fold(
+      onSuccess: Ok.new,
+      onError: fn,
+    );
+  }
 }
 
 /// A [Result] representing a successful operation.
-final class Ok<T, E> extends Result<T, E> {
+final class Ok<T extends Object, E extends Object> extends Result<T, E> {
   /// Creates an [Ok] with the given [value].
   const Ok(this.value);
 
@@ -200,7 +159,7 @@ final class Ok<T, E> extends Result<T, E> {
 }
 
 /// A [Result] representing a failed operation.
-final class Err<T, E> extends Result<T, E> {
+final class Err<T extends Object, E extends Object> extends Result<T, E> {
   /// Creates an [Err] with the given [error].
   const Err(this.error);
 
