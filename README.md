@@ -77,18 +77,35 @@ While heavily inspired by Functional Programming (FP) concepts like immutability
 
 Stop rewriting the same boilerplate to defend against implicit behavior. `explicit` provides the standardized foundation to build software that simply does what it says.
 
+## Architecture
+
+`explicit` is a **facade** over [`explicit_outcome`][explicit_outcome_link]. Core primitives (`Res`, `Opt`, `AsyncRes`, `AsyncOpt`) live in `explicit_outcome` and are re-exported through this package. The facade adds ergonomic utilities for nullable conversion, lazy closure adapters, and experimental parallel composition — without changing primitive behavior.
+
+```
+package:explicit/explicit.dart
+  ├── explicit_outcome primitives (re-exported)
+  │   ├── Res<T, E>, Ok, Err, AsyncRes
+  │   └── Opt<T>, Val, Nil, AsyncOpt
+  └── facade utilities
+      ├── .toOpt (nullable conversion)
+      ├── .toAsyncOpt() / .toAsyncRes() (closure adapters)
+      └── ParallelOpt2..5 / ParallelRes2..5 (experimental)
+```
+
 ## Features
 
-| Feature             | API                                                      | Notes                                                                 |
-| ------------------- | -------------------------------------------------------- | --------------------------------------------------------------------- |
-| Compact sync result | `Res<T, E>`, `Ok<T, E>`, `Err<T, E>`                     | `Res` is a typedef for the sealed `Result<T, E>` base.                |
-| Composition         | `map`, `mapError`, `flatMap`, `andThen`                  | `andThen` is an alias for `flatMap` for callers that prefer the name. |
-| Branch handling     | `fold`, `when`, `getOrElse`                              | `fold` returns a value; `when` is for side effects.                   |
-| Programmer errors   | `expect`, `expectError`                                  | Both throw `StateError` when called on the wrong variant.             |
-| Record access       | `toRecord` (deprecated)                                  | Kept for compatibility; prefer `fold` for new code.                   |
-| Lazy async          | `AsyncRes<T, E>` with `run`, `map`, `flatMap`, `andThen` | Work does not start until `run()` is called.                          |
-| Retry               | `retry(operation, maxAttempts: 3)`                       | Standalone function; throws `ArgumentError` for `maxAttempts <= 0`.   |
-| Compatibility       | `Success<T, E>`, `Failure<T, E>`                         | Typedef aliases for `Ok` and `Err` to ease migration.                 |
+| Feature | API | Notes |
+|---|---|---|
+| Compact sync result | `Res<T, E>`, `Ok<T, E>`, `Err<T, E>` | `Res` is a typedef for the sealed `Result<T, E>` base. |
+| Option type | `Opt<T>`, `Val<T>`, `Nil` | Nullable-safe option type from `explicit_outcome`. |
+| Composition | `map`, `mapError`, `flatMap`, `andThen` | `andThen` is an alias for `flatMap` for callers that prefer the name. |
+| Branch handling | `fold`, `when`, `getOrElse` | `fold` returns a value; `when` is for side effects. |
+| Programmer errors | `expect`, `expectError` | Both throw `StateError` when called on the wrong variant. |
+| Lazy async | `AsyncRes<T, E>`, `AsyncOpt<T>` | Work does not start until `run()` is called. |
+| Nullable conversion | `.toOpt` extension | `null` → `Nil`, non-null → `Val<T>` with non-nullable payload. |
+| Closure adapters | `.toAsyncOpt()`, `.toAsyncRes()` | Wrap lazy closures as `AsyncOpt`/`AsyncRes`. Experimental. |
+| Parallel composition | `ParallelOpt2..5`, `ParallelRes2..5` | Concurrent lazy execution with typed records. Experimental. |
+| Compatibility | `Success<T, E>`, `Failure<T, E>` | Typedef aliases for `Ok` and `Err` to ease migration. |
 
 ## Usage
 
@@ -161,22 +178,27 @@ okResult.expectError();   // throws StateError
 errResult.expect();       // throws StateError
 ```
 
-### 4. Record access
+### 4. Convert nullable values with `.toOpt`
 
-`toRecord()` returns a `(T? value, E? error)` record. One slot is always
-`null`, so always check `isSuccess` or `isFailure` before reading the payload.
-The API is kept for compatibility but new code should prefer `fold` or
-pattern matching:
+The `.toOpt` extension converts any nullable value to an `Opt<T>`. `null`
+becomes `Nil`, and non-null values become `Val<T>` with a non-nullable
+payload type enforced by the analyzer.
 
 ```dart
-// ignore_for_file: deprecated_member_use_from_same_package
-final record = result.toRecord();
-if (result.isSuccess) {
-  print('value=${record.$1}');
-} else {
-  print('error=${record.$2}');
+String? maybeName = fetchName();
+Opt<String> nameOpt = maybeName.toOpt;
+
+// Pattern match on the result:
+switch (nameOpt) {
+  case Val(:final value):
+    print('name=$value');
+  case Nil():
+    print('no name');
 }
 ```
+
+The payload type `T` is constrained to `extends Object`, so the analyzer
+rejects `Opt<int?>` — the payload is always non-null after conversion.
 
 ### 5. Compose async pipelines with `AsyncRes`
 
@@ -197,53 +219,126 @@ final result = await pipeline.run(); // Res<String, String>
 ```
 
 Nothing runs until `run()`. Calling `run()` multiple times re-executes the
-pipeline, which is useful for retries and replays.
+pipeline — there is no hidden caching or memoization.
 
-### 6. Retry transient failures
+### 6. Adapt lazy closures with `.toAsyncOpt()` / `.toAsyncRes()`
 
-`retry` is a standalone utility (not a method on `AsyncRes`). It repeatedly
-calls the async operation until it returns `Ok` or the attempt budget is
-exhausted. `maxAttempts` must be greater than zero; otherwise the function
-throws `ArgumentError` synchronously.
+When you have a closure that returns a `Future<Opt<T>>` or `Future<Res<T, E>>`,
+use the adapter extensions to wrap it as an `AsyncOpt` or `AsyncRes` without
+invoking the closure eagerly.
 
 ```dart
-Future<Res<String, String>> flakyFetch() async {
-  // Imagine a network call that can fail.
-  return Err<String, String>('transient');
-}
+Future<Opt<int>> fetchCount() async => Val(42);
 
-final result = await retry<String, String>(
-  flakyFetch,
-  maxAttempts: 5,
-);
+// The closure is NOT called here — just wrapped:
+final asyncOpt = fetchCount.toAsyncOpt();
 
-result.when(
-  onSuccess: (body) => print('body=$body'),
-  onError: (error) => print('gave up: $error'),
-);
+// Work starts only when you call run():
+final result = await asyncOpt.run(); // Opt<int>
 ```
+
+```dart
+Future<Res<String, String>> fetchBody() async => Ok('hello');
+
+final asyncRes = fetchBody.toAsyncRes();
+final result = await asyncRes.run(); // Res<String, String>
+```
+
+Each call to `run()` re-invokes the closure. There is no hidden caching.
+
+### 7. Run recipes in parallel with `ParallelOpt` / `ParallelRes` (experimental)
+
+> **Experimental**: These classes are marked `@experimental` and may change
+> in future versions.
+
+`ParallelOpt2` through `ParallelOpt5` run multiple `AsyncOpt` recipes
+concurrently and combine results into a typed record. `ParallelRes2` through
+`ParallelRes5` do the same for `AsyncRes` recipes.
+
+```dart
+final asyncOptA = AsyncOpt<int>(() async => Val(1));
+final asyncOptB = AsyncOpt<String>(() async => Val('hello'));
+
+final parallel = ParallelOpt2(asyncOptA, asyncOptB);
+final result = await parallel.run(); // Opt<(int, String)>
+// result is Val((1, 'hello'))
+```
+
+```dart
+final asyncResA = AsyncRes<int, String>(() async => Ok(1));
+final asyncResB = AsyncRes<String, String>(() async => Ok('hello'));
+
+final parallel = ParallelRes2(asyncResA, asyncResB);
+final result = await parallel.run(); // Res<(int, String), String>
+// result is Ok((1, 'hello'))
+```
+
+#### Key semantics
+
+| Behavior | Detail |
+|---|---|
+| **Laziness** | No work happens until `.run()` is called. Construction stores recipes only. |
+| **Repeated runs** | Each `.run()` re-executes all recipes. There is no hidden caching. |
+| **Nil propagation** | `ParallelOpt`: if any recipe produces `Nil`, the result is `Nil`. |
+| **Error propagation** | `ParallelRes`: if any recipe produces `Err`, the result is the first `Err` by parameter order. |
+| **No hidden retry** | Classes do not retry, catch, or convert thrown exceptions. |
+| **No hidden caching** | Each `.run()` starts fresh. Caller controls memoization externally. |
+| **Typed records** | Results use Dart records `(A, B)`, `(A, B, C)`, etc. — no `List<dynamic>` casts. |
+
+#### Available arities
+
+| Class | Recipes | Result type |
+|---|---|---|
+| `ParallelOpt2` | 2 × `AsyncOpt` | `Future<Opt<(A, B)>>` |
+| `ParallelOpt3` | 3 × `AsyncOpt` | `Future<Opt<(A, B, C)>>` |
+| `ParallelOpt4` | 4 × `AsyncOpt` | `Future<Opt<(A, B, C, D)>>` |
+| `ParallelOpt5` | 5 × `AsyncOpt` | `Future<Opt<(A, B, C, D, E)>>` |
+| `ParallelRes2` | 2 × `AsyncRes` | `Future<Res<(A, B), E>>` |
+| `ParallelRes3` | 3 × `AsyncRes` | `Future<Res<(A, B, C), E>>` |
+| `ParallelRes4` | 4 × `AsyncRes` | `Future<Res<(A, B, C, D), E>>` |
+| `ParallelRes5` | 5 × `AsyncRes` | `Future<Res<(A, B, C, D, F), E>>` |
+
+There are no factory or helper functions for these classes. Construct them
+directly: `ParallelOpt2(a, b)`, not `parallelOpt2(a, b)`.
 
 ## API reference
 
-| Symbol                              | Kind         | Description                                                                       |
-| ----------------------------------- | ------------ | --------------------------------------------------------------------------------- |
-| `Res<T, E>`                         | typedef      | Compact alias for `Result<T, E>`.                                                 |
-| `Result<T, E>`                      | sealed class | Base type. Pattern-match with `case Ok(:final value)` / `case Err(:final error)`. |
-| `Ok<T, E>`                          | class        | Success variant.                                                                  |
-| `Err<T, E>`                         | class        | Error variant.                                                                    |
-| `Result.fold`                       | method       | Branch on the variant and return a value.                                         |
-| `Result.map`                        | method       | Transform the success value.                                                      |
-| `Result.mapError`                   | method       | Transform the error value.                                                        |
-| `Result.flatMap` / `Result.andThen` | method       | Chain another `Result`-returning function.                                        |
-| `Result.when`                       | method       | Side-effect-only branching.                                                       |
-| `Result.getOrElse`                  | method       | Provide a default from the error branch.                                          |
-| `Result.expect`                     | method       | Returns the value or throws `StateError`.                                         |
-| `Result.expectError`                | method       | Returns the error or throws `StateError`.                                         |
-| `Result.toRecord` (deprecated)      | method       | Record representation `(T?, E?)`.                                                 |
-| `Success<T, E>`                     | typedef      | Compatibility alias for `Ok`.                                                     |
-| `Failure<T, E>`                     | typedef      | Compatibility alias for `Err`.                                                    |
-| `AsyncRes<T, E>`                    | class        | Lazy async pipeline. `run`, `map`, `flatMap`, `andThen`.                          |
-| `retry<T, E>`                       | function     | Repeat an async operation up to `maxAttempts`.                                    |
+| Symbol | Kind | Description |
+|---|---|---|
+| `Res<T, E>` | typedef | Compact alias for `Result<T, E>`. |
+| `Result<T, E>` | sealed class | Base type. Pattern-match with `case Ok(:final value)` / `case Err(:final error)`. |
+| `Ok<T, E>` | class | Success variant. |
+| `Err<T, E>` | class | Error variant. |
+| `Opt<T>` | sealed class | Option type. `Val<T>` or `Nil`. |
+| `Val<T>` | class | Present option variant. |
+| `Nil` | class | Absent option variant. |
+| `AsyncRes<T, E>` | class | Lazy async result. `run`, `map`, `flatMap`, `andThen`. |
+| `AsyncOpt<T>` | class | Lazy async option. `run`, `map`. |
+| `Result.fold` | method | Branch on the variant and return a value. |
+| `Result.map` | method | Transform the success value. |
+| `Result.mapError` | method | Transform the error value. |
+| `Result.flatMap` / `Result.andThen` | method | Chain another `Result`-returning function. |
+| `Result.when` | method | Side-effect-only branching. |
+| `Result.getOrElse` | method | Provide a default from the error branch. |
+| `Result.expect` | method | Returns the value or throws `StateError`. |
+| `Result.expectError` | method | Returns the error or throws `StateError`. |
+| `NullableToOpt.toOpt` | extension | Converts `T?` to `Opt<T>`. |
+| `.toAsyncOpt()` | extension | Wraps `Future<Opt<T>> Function()` as `AsyncOpt<T>`. Experimental. |
+| `.toAsyncRes()` | extension | Wraps `Future<Res<T, E>> Function()` as `AsyncRes<T, E>`. Experimental. |
+| `ParallelOpt2..5` | class | Concurrent lazy `AsyncOpt` composition into typed records. Experimental. |
+| `ParallelRes2..5` | class | Concurrent lazy `AsyncRes` composition into typed records. Experimental. |
+| `Success<T, E>` | typedef | Compatibility alias for `Ok`. |
+| `Failure<T, E>` | typedef | Compatibility alias for `Err`. |
+
+## What this library does NOT do
+
+| Non-feature | Reason |
+|---|---|
+| Hidden retry | Retry is an explicit policy decision, not a default behavior. |
+| Hidden exception catching | Exceptions propagate. Use `fold` or pattern matching for expected failures. |
+| Hidden caching / memoization | Each `run()` starts fresh. Caller controls caching externally. |
+| Implicit repeated execution | Calling `run()` twice runs twice. No hidden replay policy. |
+| Factory functions for parallel classes | Construct classes directly. Helper functions would duplicate the API. |
 
 ## Example
 
@@ -252,9 +347,9 @@ own `pubspec.yaml` with a path dependency back to this package and uses the VGV
 Dart CLI layout at
 [`example/bin/explicit_example.dart`](example/bin/explicit_example.dart).
 
-The app walks through success, failure, `flatMap`/`andThen`, `toRecord`, the
-lazy `AsyncRes` pipeline, `AsyncRes` with `retry`, and awaited async
-composition. Run it from the example directory:
+The app walks through success, failure, `flatMap`/`andThen`, the lazy
+`AsyncRes` pipeline, and awaited async composition. Run it from the example
+directory:
 
 ```sh
 cd example
@@ -300,3 +395,4 @@ Lints follow [Very Good Analysis][very_good_analysis_link].
 [coverage_badge]: https://img.shields.io/badge/coverage-100%25-brightgreen.svg
 [coverage_link]: coverage/lcov.info
 [github_actions_link]: https://docs.github.com/en/actions
+[explicit_outcome_link]: https://pub.dev/packages/explicit_outcome
