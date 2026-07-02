@@ -1,10 +1,10 @@
 name: explicit
 description: Declarative Dart utilities for explicit, predictable development with typed outcomes.
 version: 0.0.1
-publish_to: none
 license: MPL-2.0
 homepage: https://github.com/danxorzum/explicit/tree/main/packages/explicit
 repository: https://github.com/danxorzum/explicit
+issue_tracker: https://github.com/danxorzum/explicit/issues
 resolution: workspace
 
 environment:
