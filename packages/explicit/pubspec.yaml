@@ -3,8 +3,8 @@ description: Declarative Dart utilities for explicit, predictable development wi
 version: 0.0.1
 publish_to: none
 license: MPL-2.0
-homepage: https://github.com/danxor/mairi_dart/tree/main/explicit
-repository: https://github.com/danxor/mairi_dart
+homepage: https://github.com/danxorzum/explicit/tree/main/packages/explicit
+repository: https://github.com/danxorzum/explicit
 resolution: workspace
 
 environment:

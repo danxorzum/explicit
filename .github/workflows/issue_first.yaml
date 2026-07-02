@@ -1,0 +1,82 @@
+name: Issue-First Policy
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize]
+
+jobs:
+  require-linked-issue:
+    runs-on: ubuntu-latest
+    # Skip bot actors (Dependabot, Renovate, etc.)
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      !endsWith(github.actor, '[bot]')
+    permissions:
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Check for linked issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const text = `${pr.title}\n${pr.body ?? ''}`;
+
+            // Detect issue references:
+            //   - GitHub closing keywords: closes, fixes, resolves, closed, fix, resolve, close
+            //   - Plain #number references
+            //   - Full issue URLs
+            const patterns = [
+              /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#\d+/gi,
+              /#\d+/,
+              /\/issues\/\d+/,
+            ];
+
+            const hasReference = patterns.some((p) => p.test(text));
+
+            if (hasReference) {
+              core.info('Linked issue reference found — policy satisfied.');
+              return;
+            }
+
+            // No issue reference found — comment and close.
+            const comment = [
+              'Thank you for your interest in contributing to **explicit**.',
+              '',
+              'This project follows an **issue-first** policy. Every pull request must',
+              'reference an approved issue so we can validate intent, scope, and',
+              'alignment with the Explicit Code philosophy before reviewing code.',
+              '',
+              '**What to do next:**',
+              '',
+              '1. [Open an issue](https://github.com/danxorzum/explicit/issues/new/choose)',
+              '   describing the change you want to make.',
+              '2. Wait for a maintainer to confirm the approach.',
+              '3. Link the issue in your PR body using a closing keyword',
+              '   (e.g. `Closes #123`, `Fixes #456`).',
+              '',
+              'This PR is being closed automatically. You are welcome to reopen it',
+              'once an issue is linked.',
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body: comment,
+            });
+
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              state: 'closed',
+            });
+
+            core.setFailed(
+              `PR #${pr.number} closed — no linked issue found.`
+            );

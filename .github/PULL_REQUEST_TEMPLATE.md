@@ -1,10 +1,20 @@
 <!--
   Thanks for contributing!
 
-  Provide a description of your changes below and a general summary in the title
+  IMPORTANT: This project follows an issue-first policy.
+  Every PR must reference an approved issue. PRs without a linked issue
+  are closed automatically. See CONTRIBUTING in the README for details.
+
+  Provide a description of your changes below and a general summary in the title.
 
   Please look at the following checklist to ensure that your PR can be accepted quickly:
 -->
+
+## Linked Issue
+
+<!-- Required. Use a closing keyword (e.g. Closes #123, Fixes #456) or paste the issue URL. -->
+
+Closes #
 
 ## Status
 
