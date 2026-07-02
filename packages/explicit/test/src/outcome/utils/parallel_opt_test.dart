@@ -371,7 +371,8 @@ void main() {
         expect(
           result.exitCode,
           isNot(0),
-          reason: 'Analyzer must reject Future<Opt<T>> '
+          reason:
+              'Analyzer must reject Future<Opt<T>> '
               'where AsyncOpt<T> is required',
         );
         expect(
