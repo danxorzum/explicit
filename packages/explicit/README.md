@@ -326,8 +326,8 @@ These adapters let you bring existing nullable APIs and async functions into the
 - **License:** [Mozilla Public License 2.0][license_link] (MPL-2.0).
 
 [result_wikipedia]: https://en.wikipedia.org/wiki/Result_type
-[ci_badge]: https://github.com/danxorzum/explicit/actions/workflows/main.yaml/badge.svg?branch=main
-[ci_link]: https://github.com/danxorzum/explicit/actions/workflows/main.yaml
+[ci_badge]: https://github.com/danxorzum/explicit/actions/workflows/ci.yaml/badge.svg?branch=main
+[ci_link]: https://github.com/danxorzum/explicit/actions/workflows/ci.yaml
 [coverage_badge]: https://img.shields.io/badge/coverage-100%25-brightgreen.svg
 [license_badge]: https://img.shields.io/badge/license-MPL_2.0-blue.svg
 [license_link]: https://opensource.org/licenses/MPL-2.0

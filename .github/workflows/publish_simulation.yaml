@@ -1,0 +1,91 @@
+name: Publish Simulation
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+    inputs:
+      packages:
+        description: "Comma-separated publish candidates, e.g. explicit_outcome or explicit_outcome,explicit. Leave empty to validate without publish candidates."
+        required: false
+        default: ""
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  # Job 1: Full workspace quality gate
+  quality_gate:
+    name: Full quality gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: "3.12.0"
+
+      - name: Install workspace dependencies
+        run: dart pub get
+
+      - name: Run full quality gate (all packages)
+        run: dart run tool/quality_gate.dart --mode=all
+
+  # Job 2: Publish dry-run readiness
+  publish_check:
+    name: Publish dry-run
+    needs: quality_gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: "3.12.0"
+
+      - name: Install workspace dependencies
+        run: dart pub get
+
+      - name: Publish dry-run check
+        run: dart run melos run publish:check
+
+  # Job 3: Pana max-score gate
+  pana_check:
+    name: Pana max-score gate
+    needs: quality_gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: "3.12.0"
+
+      - name: Install workspace dependencies
+        run: dart pub get
+
+      - name: Run Pana gate
+        run: dart run tool/pana_gate.dart --all
+
+  # Job 4: No-op publish simulation (final step)
+  publish_simulation:
+    name: Publish simulation (no-op)
+    needs: [publish_check, pana_check]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: "3.12.0"
+
+      - name: Install workspace dependencies
+        run: dart pub get
+
+      - name: Run publish simulation
+        run: dart run tool/publish_simulation.dart --packages="${{ github.event.inputs.packages || '' }}"

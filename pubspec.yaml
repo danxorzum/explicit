@@ -70,7 +70,14 @@ melos:
 
     publish:simulate:
       description: >
-        Run safe no-op publish simulation. Prints package names, versions,
-        and intended order without publishing. Never executes real publish.
-        Usage: melos run publish:simulate
+        Run safe no-op publish simulation for explicitly selected publish
+        candidates. Never expands dependents for publication and never executes
+        real publish. Usage: melos run publish:simulate -- --packages=explicit_outcome
       run: dart run tool/publish_simulation.dart
+
+    hooks:install:
+      description: >
+        Install or update the pre-push quality gate hook.
+        The hook runs the same gates as CI (format, analyze, test, coverage).
+        Usage: melos run hooks:install [-- --uninstall]
+      run: dart run tool/install_hooks.dart

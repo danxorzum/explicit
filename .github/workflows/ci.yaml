@@ -1,0 +1,56 @@
+name: CI
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  # Job 1: Quality gate (format → analyze → test/coverage, fail-fast)
+  quality_gate:
+    name: Quality gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: "3.12.0"
+
+      - name: Install workspace dependencies
+        run: dart pub get
+
+      - name: Run quality gate
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "Main branch push: validating all packages"
+            dart run tool/quality_gate.dart --mode=all
+          else
+            echo "Pull request: validating affected packages"
+            dart run tool/quality_gate.dart \
+              --mode=pr \
+              --base=${{ github.event.pull_request.base.sha }} \
+              --head=${{ github.event.pull_request.head.sha }}
+          fi
+
+  # Job 2: Semantic PR title (independent, metadata only)
+  semantic_pull_request:
+    name: Semantic PR title
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

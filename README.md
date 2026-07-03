@@ -340,15 +340,31 @@ dart analyze packages/explicit_outcome
 dart analyze packages/explicit
 ```
 
+### Pre-push quality gate
+
+Install the local pre-push hook to catch format, analyze, test, and coverage failures before pushing:
+
+```sh
+melos run hooks:install
+```
+
+The hook runs the same validation as CI — no divergent logic. To uninstall:
+
+```sh
+melos run hooks:install -- --uninstall
+```
+
 ## Contributing
 
 Contributions are welcome. This repository uses the following automation and conventions:
 
-- **CI** ([`main.yaml`][ci_link]): runs semantic PR title checks, spell-check, and builds with tests on every push and pull request to `main`.
-- **License check** ([`license_check.yaml`]): validates allowed licenses on relevant file changes.
+- **CI** ([`ci.yaml`][ci_link]): runs strict quality gates (format, analyze, tests, 100% coverage) on every push and pull request to `main`, plus semantic PR title checks.
+- **Publish simulation** ([`publish_simulation.yaml`]): validates publish readiness with dry-run, Pana gates, and no-op simulation — never publishes to pub.dev. Publish candidates are explicit; validating a dependent package does not automatically make it a release candidate.
 - **Dependabot** ([`dependabot.yaml`]): opens daily pull requests for outdated GitHub Actions and pub dependencies.
 - **Issue-first policy** ([`issue_first.yaml`]): automatically closes pull requests that do not reference a linked issue.
 - **Pull request template** ([`PULL_REQUEST_TEMPLATE.md`]): every PR must include a linked issue, Status, Description, and the Type of Change checklist.
+
+License validation is intentionally deferred until a workspace-safe license gate is added. The previous reusable license workflow assumed root-package behavior and did not cover this monorepo correctly.
 
 ### Issue-first policy
 
@@ -402,8 +418,8 @@ For contributors, this monorepo contains:
 Users should install `explicit` via `dart pub add explicit` — the outcome primitives are included.
 
 [result_wikipedia]: https://en.wikipedia.org/wiki/Result_type
-[ci_badge]: https://github.com/danxorzum/explicit/actions/workflows/main.yaml/badge.svg?branch=main
-[ci_link]: https://github.com/danxorzum/explicit/actions/workflows/main.yaml
+[ci_badge]: https://github.com/danxorzum/explicit/actions/workflows/ci.yaml/badge.svg?branch=main
+[ci_link]: https://github.com/danxorzum/explicit/actions/workflows/ci.yaml
 [coverage_badge]: https://img.shields.io/badge/coverage-100%25-brightgreen.svg
 [license_badge]: https://img.shields.io/badge/license-MPL_2.0-blue.svg
 [license_link]: https://opensource.org/licenses/MPL-2.0
@@ -412,7 +428,6 @@ Users should install `explicit` via `dart pub add explicit` — the outcome prim
 [very_good_analysis_badge]: https://img.shields.io/badge/style-very_good_analysis-B22C89.svg
 [very_good_analysis_link]: https://pub.dev/packages/very_good_analysis
 [issue_tracker_link]: https://github.com/danxorzum/explicit/issues
-[license_check.yaml]: https://github.com/danxorzum/explicit/blob/main/.github/workflows/license_check.yaml
 [dependabot.yaml]: https://github.com/danxorzum/explicit/blob/main/.github/dependabot.yaml
 [issue_first.yaml]: https://github.com/danxorzum/explicit/blob/main/.github/workflows/issue_first.yaml
 [PULL_REQUEST_TEMPLATE.md]: https://github.com/danxorzum/explicit/blob/main/.github/PULL_REQUEST_TEMPLATE.md

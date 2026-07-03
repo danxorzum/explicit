@@ -3,6 +3,7 @@
 // Usage:
 //   dart run tool/publish_simulation.dart
 //   dart run tool/publish_simulation.dart --packages=explicit_outcome,explicit
+//   dart run tool/publish_simulation.dart --all
 //
 // SAFETY: This script NEVER executes real publish commands.
 // It only prints what WOULD be published, in what order.
@@ -19,17 +20,45 @@ Future<void> main(List<String> args) async {
     ..writeln('=== Publish Simulation (No-Op) ===')
     ..writeln();
 
-  // Determine which packages to simulate
+  // Determine explicit publish candidates.
+  //
+  // IMPORTANT: validation expansion and publish selection are separate. For
+  // example, an `explicit_outcome` change may validate dependent `explicit`,
+  // but it must not automatically publish `explicit` unless that package is an
+  // intentional release candidate too.
   final List<String> packageNames;
   final customPackages = args
       .where((a) => a.startsWith('--packages='))
       .map((a) => a.substring('--packages='.length))
       .firstOrNull;
+  final includeAll = args.contains('--all');
 
   if (customPackages != null) {
-    packageNames = customPackages.split(',').map((s) => s.trim()).toList();
-  } else {
+    packageNames = customPackages
+        .split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+  } else if (includeAll) {
     packageNames = AffectedDetector.allPackages.toList();
+  } else {
+    packageNames = const [];
+  }
+
+  if (packageNames.isEmpty) {
+    stdout
+      ..writeln('No publish candidates selected.')
+      ..writeln()
+      ..writeln('Validation may still run for all affected/dependent packages,')
+      ..writeln('but publish simulation requires explicit release intent.')
+      ..writeln()
+      ..writeln('Use one of:')
+      ..writeln('  dart run tool/publish_simulation.dart --packages=explicit_outcome')
+      ..writeln('  dart run tool/publish_simulation.dart --packages=explicit_outcome,explicit')
+      ..writeln('  dart run tool/publish_simulation.dart --all')
+      ..writeln()
+      ..writeln('Status: SIMULATION ONLY — nothing was published');
+    return;
   }
 
   // Read package info from pubspec.yaml files
