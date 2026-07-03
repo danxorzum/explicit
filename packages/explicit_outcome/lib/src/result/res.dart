@@ -50,10 +50,7 @@ sealed class Result<T extends Object, E extends Object> {
   /// [Err].
   ///
   /// Returns the result of the executed function.
-  R fold<R>({
-    required R Function(T) onSuccess,
-    required R Function(E) onError,
-  });
+  R fold<R>({required R Function(T) onSuccess, required R Function(E) onError});
 
   /// Returns `true` if this is an [Ok].
   bool get isSuccess => fold(onSuccess: (_) => true, onError: (_) => false);
@@ -66,10 +63,7 @@ sealed class Result<T extends Object, E extends Object> {
   /// If this is an [Err], the [fallback] function is called with the error
   /// value to provide a value.
   T getOrElse(T Function(E) fallback) {
-    return fold(
-      onSuccess: (value) => value,
-      onError: fallback,
-    );
+    return fold(onSuccess: (value) => value, onError: fallback);
   }
 
   /// Executes [onSuccess] if this is an [Ok], or [onError] if this is an
@@ -78,40 +72,28 @@ sealed class Result<T extends Object, E extends Object> {
     required void Function(T) onSuccess,
     required void Function(E) onError,
   }) {
-    fold(
-      onSuccess: onSuccess,
-      onError: onError,
-    );
+    fold(onSuccess: onSuccess, onError: onError);
   }
 
   /// Transforms the success value using [fn].
   ///
   /// If this is an [Err], the error is propagated.
   Res<R, E> map<R extends Object>(R Function(T) fn) {
-    return fold(
-      onSuccess: (value) => Ok(fn(value)),
-      onError: Err.new,
-    );
+    return fold(onSuccess: (value) => Ok(fn(value)), onError: Err.new);
   }
 
   /// Chains another [Result] operation when this result is [Ok].
   ///
   /// If this is an [Err], the error is propagated and [fn] is not called.
   Res<R, E> next<R extends Object>(Res<R, E> Function(T) fn) {
-    return fold(
-      onSuccess: fn,
-      onError: Err.new,
-    );
+    return fold(onSuccess: fn, onError: Err.new);
   }
 
   /// Transforms the error value using [fn].
   ///
   /// If this is an [Ok], the value is propagated.
   Res<T, R> mapError<R extends Object>(R Function(E) fn) {
-    return fold(
-      onSuccess: Ok.new,
-      onError: (error) => Err(fn(error)),
-    );
+    return fold(onSuccess: Ok.new, onError: (error) => Err(fn(error)));
   }
 
   /// Returns this result if it is [Ok], or calls [fn] with the error.
@@ -119,10 +101,7 @@ sealed class Result<T extends Object, E extends Object> {
   /// If this is an [Ok], the success value is preserved and [fn] is not called.
   /// If this is an [Err], [fn] receives the error and its result is returned.
   Res<T, E> or(Res<T, E> Function(E error) fn) {
-    return fold(
-      onSuccess: Ok.new,
-      onError: fn,
-    );
+    return fold(onSuccess: Ok.new, onError: fn);
   }
 }
 

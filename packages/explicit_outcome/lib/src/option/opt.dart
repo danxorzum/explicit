@@ -44,10 +44,7 @@ sealed class Option<T extends Object> {
   /// a [Nil].
   ///
   /// Returns the value produced by the executed function.
-  R fold<R>({
-    required R Function(T) onVal,
-    required R Function() onNil,
-  });
+  R fold<R>({required R Function(T) onVal, required R Function() onNil});
 
   /// Returns `true` if this is an [Val].
   bool get hasValue => fold(onVal: (_) => true, onNil: () => false);
@@ -59,37 +56,25 @@ sealed class Option<T extends Object> {
   ///
   /// If this is a [Nil], the [fallback] function is called to provide a value.
   T getOrElse(T Function() fallback) {
-    return fold(
-      onVal: (value) => value,
-      onNil: () => fallback(),
-    );
+    return fold(onVal: (value) => value, onNil: () => fallback());
   }
 
   /// Executes [onVal] if this is an [Val], or [onNil] if it is
   /// a [Nil].
-  void when({
-    required void Function(T) onVal,
-    required void Function() onNil,
-  }) {
+  void when({required void Function(T) onVal, required void Function() onNil}) {
     fold(onVal: onVal, onNil: onNil);
   }
 
   /// Transforms the present value using [fn].
   Opt<R> map<R extends Object>(R Function(T) fn) {
-    return fold(
-      onVal: (value) => Val(fn(value)),
-      onNil: Nil<R>.new,
-    );
+    return fold(onVal: (value) => Val(fn(value)), onNil: Nil<R>.new);
   }
 
   /// Chains another [Option] operation when this option is [Val].
   ///
   /// If this option is [Nil], [fn] is not called.
   Opt<R> next<R extends Object>(Opt<R> Function(T) fn) {
-    return fold(
-      onVal: fn,
-      onNil: Nil<R>.new,
-    );
+    return fold(onVal: fn, onNil: Nil<R>.new);
   }
 
   /// Chains another [Option] operation when this option is [Nil].
@@ -107,10 +92,7 @@ final class Val<T extends Object> extends Opt<T> {
   final T value;
 
   @override
-  R fold<R>({
-    required R Function(T) onVal,
-    required R Function() onNil,
-  }) {
+  R fold<R>({required R Function(T) onVal, required R Function() onNil}) {
     return onVal(value);
   }
 
@@ -136,10 +118,7 @@ final class Nil<T extends Object> extends Opt<T> {
   const Nil();
 
   @override
-  R fold<R>({
-    required R Function(T) onVal,
-    required R Function() onNil,
-  }) {
+  R fold<R>({required R Function(T) onVal, required R Function() onNil}) {
     return onNil();
   }
 
