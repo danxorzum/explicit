@@ -20,6 +20,15 @@ Use it to model operations with a simple [Result][result_wikipedia] toolkit. Eli
 dart pub add explicit
 ```
 
+### Run the example app
+
+```sh
+cd example
+dart run
+```
+
+Current package coverage is **100%** (75/75 lines).
+
 ### Model success and failure
 
 Use `Ok` for successful values and `Err` for recoverable failures.

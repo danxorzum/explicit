@@ -155,6 +155,28 @@ void main() {
       expect(result.isNil, isTrue);
     });
 
+    test('Nil in first recipe produces Nil', () async {
+      final a = AsyncOpt<int>(() async => const Nil());
+      final b = AsyncOpt<String>(() async => const Val('two'));
+      final c = AsyncOpt<double>(() async => const Val(3.14));
+
+      final result = await ParallelOpt3(a, b, c).run();
+
+      expect(result, isA<Nil<(int, String, double)>>());
+      expect(result.isNil, isTrue);
+    });
+
+    test('Nil in third recipe produces Nil', () async {
+      final a = AsyncOpt<int>(() async => const Val(1));
+      final b = AsyncOpt<String>(() async => const Val('two'));
+      final c = AsyncOpt<double>(() async => const Nil());
+
+      final result = await ParallelOpt3(a, b, c).run();
+
+      expect(result, isA<Nil<(int, String, double)>>());
+      expect(result.isNil, isTrue);
+    });
+
     test('no eager execution before run()', () {
       var callCount = 0;
 
@@ -201,6 +223,39 @@ void main() {
       final b = AsyncOpt<String>(() async => const Val('two'));
       final c = AsyncOpt<double>(() async => const Nil());
       final d = AsyncOpt<bool>(() async => const Val(true));
+
+      final result = await ParallelOpt4(a, b, c, d).run();
+
+      expect(result.isNil, isTrue);
+    });
+
+    test('Nil in first recipe produces Nil', () async {
+      final a = AsyncOpt<int>(() async => const Nil());
+      final b = AsyncOpt<String>(() async => const Val('two'));
+      final c = AsyncOpt<double>(() async => const Val(3.14));
+      final d = AsyncOpt<bool>(() async => const Val(true));
+
+      final result = await ParallelOpt4(a, b, c, d).run();
+
+      expect(result.isNil, isTrue);
+    });
+
+    test('Nil in second recipe produces Nil', () async {
+      final a = AsyncOpt<int>(() async => const Val(1));
+      final b = AsyncOpt<String>(() async => const Nil());
+      final c = AsyncOpt<double>(() async => const Val(3.14));
+      final d = AsyncOpt<bool>(() async => const Val(true));
+
+      final result = await ParallelOpt4(a, b, c, d).run();
+
+      expect(result.isNil, isTrue);
+    });
+
+    test('Nil in fourth recipe produces Nil', () async {
+      final a = AsyncOpt<int>(() async => const Val(1));
+      final b = AsyncOpt<String>(() async => const Val('two'));
+      final c = AsyncOpt<double>(() async => const Val(3.14));
+      final d = AsyncOpt<bool>(() async => const Nil());
 
       final result = await ParallelOpt4(a, b, c, d).run();
 
@@ -258,6 +313,54 @@ void main() {
       final c = AsyncOpt<double>(() async => const Val(3.14));
       final d = AsyncOpt<bool>(() async => const Nil());
       final e = AsyncOpt<List<int>>(() async => const Val([4, 5]));
+
+      final result = await ParallelOpt5(a, b, c, d, e).run();
+
+      expect(result.isNil, isTrue);
+    });
+
+    test('Nil in first recipe produces Nil', () async {
+      final a = AsyncOpt<int>(() async => const Nil());
+      final b = AsyncOpt<String>(() async => const Val('two'));
+      final c = AsyncOpt<double>(() async => const Val(3.14));
+      final d = AsyncOpt<bool>(() async => const Val(true));
+      final e = AsyncOpt<List<int>>(() async => const Val([4, 5]));
+
+      final result = await ParallelOpt5(a, b, c, d, e).run();
+
+      expect(result.isNil, isTrue);
+    });
+
+    test('Nil in second recipe produces Nil', () async {
+      final a = AsyncOpt<int>(() async => const Val(1));
+      final b = AsyncOpt<String>(() async => const Nil());
+      final c = AsyncOpt<double>(() async => const Val(3.14));
+      final d = AsyncOpt<bool>(() async => const Val(true));
+      final e = AsyncOpt<List<int>>(() async => const Val([4, 5]));
+
+      final result = await ParallelOpt5(a, b, c, d, e).run();
+
+      expect(result.isNil, isTrue);
+    });
+
+    test('Nil in third recipe produces Nil', () async {
+      final a = AsyncOpt<int>(() async => const Val(1));
+      final b = AsyncOpt<String>(() async => const Val('two'));
+      final c = AsyncOpt<double>(() async => const Nil());
+      final d = AsyncOpt<bool>(() async => const Val(true));
+      final e = AsyncOpt<List<int>>(() async => const Val([4, 5]));
+
+      final result = await ParallelOpt5(a, b, c, d, e).run();
+
+      expect(result.isNil, isTrue);
+    });
+
+    test('Nil in fifth recipe produces Nil', () async {
+      final a = AsyncOpt<int>(() async => const Val(1));
+      final b = AsyncOpt<String>(() async => const Val('two'));
+      final c = AsyncOpt<double>(() async => const Val(3.14));
+      final d = AsyncOpt<bool>(() async => const Val(true));
+      final e = AsyncOpt<List<int>>(() async => const Nil());
 
       final result = await ParallelOpt5(a, b, c, d, e).run();
 

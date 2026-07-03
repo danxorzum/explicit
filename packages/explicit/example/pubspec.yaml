@@ -1,0 +1,14 @@
+name: explicit_example
+description: Example command-line app for the explicit package.
+publish_to: none
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  cli_completion: ^0.5.1
+  explicit:
+    path: ../
+
+dev_dependencies:
+  very_good_analysis: ^10.2.0

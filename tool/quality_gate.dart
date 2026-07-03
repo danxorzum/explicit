@@ -11,6 +11,7 @@ import 'dart:io';
 
 import 'src/affected_detector.dart';
 import 'src/coverage_parser.dart';
+import 'src/quality_gate_commands.dart';
 import 'src/quality_gate_config.dart';
 
 Future<void> main(List<String> args) async {
@@ -52,13 +53,13 @@ Future<void> main(List<String> args) async {
 
   // Run ordered gates: format → analyze → test/coverage
   for (final package in packages) {
-    final packageDir = 'packages/$package';
+    final packageDir = packageWorkingDirectory(package);
 
     // Gate 1: Format
     stdout.writeln('\n--- Format: $package ---');
     final formatResult = await _runProcess(
-      'dart',
-      ['format', '--output=none', '--set-exit-if-changed', '.'],
+      dartExecutable,
+      qualityGateFormatArgs,
       workingDirectory: packageDir,
     );
     if (formatResult != 0) {
@@ -70,8 +71,8 @@ Future<void> main(List<String> args) async {
       // Gate 2: Analyze
       ..writeln('\n--- Analyze: $package ---');
     final analyzeResult = await _runProcess(
-      'dart',
-      ['analyze', '--fatal-infos', '.'],
+      dartExecutable,
+      qualityGateAnalyzeArgs,
       workingDirectory: packageDir,
     );
     if (analyzeResult != 0) {
@@ -83,8 +84,8 @@ Future<void> main(List<String> args) async {
       // Gate 3: Test with coverage
       ..writeln('\n--- Test + Coverage: $package ---');
     final testResult = await _runProcess(
-      'dart',
-      ['test', '--coverage=coverage'],
+      dartExecutable,
+      qualityGateTestArgs,
       workingDirectory: packageDir,
     );
     if (testResult != 0) {
@@ -93,6 +94,18 @@ Future<void> main(List<String> args) async {
     }
     stdout
       ..writeln('PASS: tests $package')
+      ..writeln('Generating LCOV for $package');
+    final lcovResult = await _runProcess(
+      dartExecutable,
+      qualityGateLcovArgs,
+      workingDirectory: packageDir,
+    );
+    if (lcovResult != 0) {
+      stderr.writeln('FAIL: LCOV generation failed for $package');
+      exit(1);
+    }
+    stdout
+      ..writeln('PASS: lcov $package')
       // Gate 4: Coverage gate (100% per package)
       ..writeln('\n--- Coverage Gate: $package ---');
     final coverageFile = File('$packageDir/coverage/lcov.info');
