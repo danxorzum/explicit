@@ -10,6 +10,7 @@ workspace:
 
 dev_dependencies:
   melos: ^7.8.2
+  pana: ^0.23.14
   test: ^1.31.1
 
 melos:
@@ -49,3 +50,27 @@ melos:
         Requires prior test run with --coverage=coverage.
         Usage: melos run quality:coverage -- --all
       run: dart run tool/coverage_gate.dart
+
+    quality:pana:
+      description: >
+        Run Pana on all publishable packages and require max score.
+        Pass condition: grantedPoints == maxPoints (not hardcoded).
+        Usage: melos run quality:pana
+      run: dart run tool/pana_gate.dart --all
+
+    publish:check:
+      description: >
+        Run publish dry-run readiness check for all packages.
+        Executes `dart pub publish --dry-run` per package.
+        Usage: melos run publish:check
+      run: dart pub publish --dry-run
+      exec:
+        concurrency: 1
+        failFast: true
+
+    publish:simulate:
+      description: >
+        Run safe no-op publish simulation. Prints package names, versions,
+        and intended order without publishing. Never executes real publish.
+        Usage: melos run publish:simulate
+      run: dart run tool/publish_simulation.dart
