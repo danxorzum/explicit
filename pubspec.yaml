@@ -28,8 +28,6 @@ melos:
         Print affected packages based on git diff (pr mode).
         Usage: melos run quality:affected
       run: dart run tool/quality_gate.dart --mode=pr --list-only
-      exec:
-        concurrency: 1
 
     quality:gate:
       description: >
