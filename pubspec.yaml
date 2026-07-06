@@ -64,10 +64,9 @@ melos:
         Run publish dry-run readiness check for all packages.
         Executes `dart pub publish --dry-run` per package.
         Usage: melos run publish:check
-      run: dart pub publish --dry-run
-      exec:
-        concurrency: 1
-        failFast: true
+      run: >
+        dart run melos exec --concurrency 1 --fail-fast --
+        "dart pub publish --dry-run"
 
     publish:simulate:
       description: >
