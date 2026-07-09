@@ -26,7 +26,7 @@ Load this skill when working in a Dart project that uses or should use the `expl
 | Operation can fail with recoverable error | `Res<T, E>` with `Ok`/`Err` |
 | Value may be absent | `Opt<T>` with `Val`/`Nil` |
 | Convert nullable to explicit | `.toOpt` extension |
-| Chain async operations | `AsyncRes<T, E>` / `AsyncOpt<T>` |
+| Chain async operations | `AsyncRes<T, E>` / `AsyncOpt<T>` (experimental) |
 | Run multiple async ops concurrently | `ParallelOpt2-5` / `ParallelRes2-5` (experimental) |
 | Wrap existing async closure | `.toAsyncRes()` / `.toAsyncOpt()` |
 

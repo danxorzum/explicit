@@ -26,10 +26,10 @@ import 'package:explicit_outcome/explicit_outcome.dart';
 | `Option<T>` | sealed class | Base type for present/absent |
 | `Val<T>` | class | Present option variant |
 | `Nil<T>` | class | Absent option variant |
-| `AsyncRes<T, E>` | class | Lazy async result |
-| `AsyncOpt<T>` | class | Lazy async option |
-| `ResultAsync<T, E>` | typedef | `Future<Res<T, E>>` |
-| `OptionAsync<T>` | typedef | `Future<Opt<T>>` |
+| `AsyncRes<T, E>` | class | Lazy async result (`@experimental`) |
+| `AsyncOpt<T>` | class | Lazy async option (`@experimental`) |
+| `ResultAsync<T, E>` | typedef | `Future<Res<T, E>>` (`@experimental`) |
+| `OptionAsync<T>` | typedef | `Future<Opt<T>>` (`@experimental`) |
 
 ## Result Methods
 
@@ -106,6 +106,8 @@ final label = result.fold(
 ```
 
 ## Async Types
+
+> `@experimental` — async APIs may change in future versions.
 
 ### AsyncRes Methods
 

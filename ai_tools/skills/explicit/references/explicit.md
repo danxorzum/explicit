@@ -20,7 +20,7 @@ No hidden retry. No hidden caching. No hidden exception catching. Every behavior
 
 ## Result: `Res<T, E>`
 
-`Res<T, E>` (alias for `Result<T, E>`) models operations that succeed with `Ok(value)` or fail with `Err(error)`. The error type `E` is unconstrained — use `String`, records, or domain objects.
+`Res<T, E>` (alias for `Result<T, E>`) models operations that succeed with `Ok(value)` or fail with `Err(error)`. Both `T` and `E` must be non-nullable object types; use `String`, records, or domain objects for recoverable failures.
 
 ### Creating
 
@@ -133,6 +133,8 @@ final label = findIndex(names, 'Alice')
 ```
 
 ## Async Pipelines: `AsyncRes<T, E>` and `AsyncOpt<T>`
+
+> `@experimental` — async pipeline APIs may change in future versions.
 
 Lazy async wrappers. Nothing executes until `run()` is called. Each `run()` starts fresh — no caching, no memoization.
 
