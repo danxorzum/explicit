@@ -1,6 +1,6 @@
 ---
 name: explicit
-description: "Trigger: explicit, Res, Opt, Result, Option, Dart result type, explicit library. Use the Dart explicit library for predictable error handling and optional values."
+description: "Trigger: Dart, Flutter, explicit, null, nullable, error handling, Result, Option, Res, Opt. Use explicit to model absence/failure without null or exceptions."
 license: MPL-2.0
 metadata:
   author: danxorzum
@@ -9,12 +9,15 @@ metadata:
 
 ## Activation Contract
 
-Load this skill when working in a Dart project that uses or should use the `explicit` library to model operations with explicit success/failure and presence/absence types instead of exceptions or nullable types.
+Load this skill when working in a Dart or Flutter project that uses or should use the `explicit` library to model operations with explicit success/failure and presence/absence types instead of exceptions or nullable types.
 
 ## Hard Rules
 
 - Use `Res<T, E>` for operations that can fail, not exceptions.
 - Use `Opt<T>` for optional values, not nullable types.
+- Do not carry `null` through domain logic. If an API returns nullable data, convert it at the boundary with `.toOpt` and continue with `Opt<T>`.
+- Make possible outcomes visible in type signatures; model success, failure, presence, and absence as data.
+- Keep control flow readable and unsurprising: no hidden retry, caching, exception catching, or implicit execution.
 - Compose with `map`, `next`, `or`, `fold` — preserve declaration order.
 - Call `run()` to execute `AsyncRes`/`AsyncOpt` pipelines (lazy by default).
 - Do not use this library for FP ceremony — it is pragmatic, not purist.
@@ -25,7 +28,7 @@ Load this skill when working in a Dart project that uses or should use the `expl
 |------|-----|
 | Operation can fail with recoverable error | `Res<T, E>` with `Ok`/`Err` |
 | Value may be absent | `Opt<T>` with `Val`/`Nil` |
-| Convert nullable to explicit | `.toOpt` extension |
+| API returns nullable data | Convert immediately with `.toOpt` |
 | Chain async operations | `AsyncRes<T, E>` / `AsyncOpt<T>` (experimental) |
 | Run multiple async ops concurrently | `ParallelOpt2-5` / `ParallelRes2-5` (experimental) |
 | Wrap existing async closure | `.toAsyncRes()` / `.toAsyncOpt()` |
@@ -68,6 +71,7 @@ Load this skill when working in a Dart project that uses or should use the `expl
 
 When implementing with `explicit`:
 - Return types must be `Res<T, E>` or `Opt<T>`, not exceptions or nullable.
+- Convert nullable inputs at system boundaries with `.toOpt`; do not propagate `null` through business logic.
 - Composition chains must preserve declaration order.
 - Async pipelines must call `run()` to execute.
 - Pattern match with `switch` on `Ok`/`Err` or `Val`/`Nil` when branching.
