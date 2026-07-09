@@ -79,3 +79,23 @@ melos:
         The hook runs the same gates as CI (format, analyze, test, coverage).
         Usage: melos run hooks:install [-- --uninstall]
       run: dart run tool/install_hooks.dart
+
+    release:changeset:
+      description: >
+        Create a new changeset boilerplate for declaring release intent.
+        Usage: melos run release:changeset -- --package=<name> --bump=<level> --summary="<text>"
+      run: dart run tool/release_changeset.dart init
+
+    release:check:
+      description: >
+        Verify that publishable package changes have matching changesets.
+        Fails CI if changesets are missing. Use --base and --head for PR mode.
+        Usage: melos run release:check -- --base=<sha> --head=<sha>
+      run: dart run tool/release_changeset.dart check
+
+    release:plan:
+      description: >
+        Render the release plan from existing changesets.
+        Shows candidates, bumps, changelog notes, and dependency updates.
+        Usage: melos run release:plan [-- --format=markdown|json]
+      run: dart run tool/release_changeset.dart plan
