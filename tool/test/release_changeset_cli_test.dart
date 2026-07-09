@@ -421,20 +421,162 @@ explicit: patch
     });
 
     group('version-pr subcommand', () {
-      test('returns not-implemented in slice one', () {
+      test('applies version edits from changesets to workspace', () {
+        final tempDir =
+            Directory.systemTemp.createTempSync('version_pr_test_');
+
+        // Create workspace structure.
+        Directory('${tempDir.path}/packages/explicit_outcome')
+            .createSync(recursive: true);
+        Directory('${tempDir.path}/packages/explicit')
+            .createSync(recursive: true);
+
+        File('${tempDir.path}/packages/explicit_outcome/pubspec.yaml')
+            .writeAsStringSync('''
+name: explicit_outcome
+version: 0.0.1
+description: Dart typed outcomes.
+''');
+        File('${tempDir.path}/packages/explicit_outcome/CHANGELOG.md')
+            .writeAsStringSync('''
+# Changelog
+
+## 0.0.1
+
+- Initial release.
+''');
+        File('${tempDir.path}/packages/explicit/pubspec.yaml')
+            .writeAsStringSync('''
+name: explicit
+version: 0.0.1
+description: Declarative Dart utilities.
+dependencies:
+  explicit_outcome: ^0.0.1
+''');
+        File('${tempDir.path}/packages/explicit/CHANGELOG.md')
+            .writeAsStringSync('''
+# Changelog
+
+## 0.0.1
+
+- Initial release.
+''');
+
+        // Create changesets directory.
+        final changesetsDir = Directory('${tempDir.path}/.changesets')
+          ..createSync();
+        File('${changesetsDir.path}/add-feature.md').writeAsStringSync('''
+---
+explicit_outcome: minor
+explicit: patch
+---
+
+- Add typed outcome API improvements.
+''');
+
         final result = Process.runSync(
           'dart',
-          ['run', 'tool/release_changeset.dart', 'version-pr'],
+          [
+            'run',
+            'tool/release_changeset.dart',
+            'version-pr',
+            '--changesets-dir=${changesetsDir.path}',
+            '--workspace-root=${tempDir.path}',
+          ],
         );
 
-        expect(result.exitCode, isNot(0));
-        expect(
-          result.stderr.toString().toLowerCase(),
-          anyOf(
-            contains('not implemented'),
-            contains('slice two'),
-          ),
+        expect(result.exitCode, 0, reason: result.stderr.toString());
+        expect(result.stdout.toString(), contains('explicit_outcome'));
+        expect(result.stdout.toString(), contains('0.1.0'));
+
+        // Verify files were edited.
+        final outcomePubspec = File(
+          '${tempDir.path}/packages/explicit_outcome/pubspec.yaml',
+        ).readAsStringSync();
+        expect(outcomePubspec, contains('version: 0.1.0'));
+
+        final explicitPubspec = File(
+          '${tempDir.path}/packages/explicit/pubspec.yaml',
+        ).readAsStringSync();
+        expect(explicitPubspec, contains('version: 0.0.2'));
+        expect(explicitPubspec, contains('explicit_outcome: ^0.1.0'));
+
+        tempDir.deleteSync(recursive: true);
+      });
+
+      test('exits zero with no-candidates message when no changesets', () {
+        final tempDir =
+            Directory.systemTemp.createTempSync('version_pr_test_');
+        final changesetsDir = Directory('${tempDir.path}/.changesets')
+          ..createSync();
+
+        final result = Process.runSync(
+          'dart',
+          [
+            'run',
+            'tool/release_changeset.dart',
+            'version-pr',
+            '--changesets-dir=${changesetsDir.path}',
+            '--workspace-root=${tempDir.path}',
+          ],
         );
+
+        expect(result.exitCode, 0, reason: result.stderr.toString());
+        expect(
+          result.stdout.toString().toLowerCase(),
+          contains('no release candidates'),
+        );
+
+        tempDir.deleteSync(recursive: true);
+      });
+
+      test('logs edits with package names and versions', () {
+        final tempDir =
+            Directory.systemTemp.createTempSync('version_pr_test_');
+
+        Directory('${tempDir.path}/packages/explicit_outcome')
+            .createSync(recursive: true);
+        File('${tempDir.path}/packages/explicit_outcome/pubspec.yaml')
+            .writeAsStringSync('''
+name: explicit_outcome
+version: 0.0.1
+description: Dart typed outcomes.
+''');
+        File('${tempDir.path}/packages/explicit_outcome/CHANGELOG.md')
+            .writeAsStringSync('''
+# Changelog
+
+## 0.0.1
+
+- Initial release.
+''');
+
+        final changesetsDir = Directory('${tempDir.path}/.changesets')
+          ..createSync();
+        File('${changesetsDir.path}/fix-bug.md').writeAsStringSync('''
+---
+explicit_outcome: patch
+---
+
+- Fix edge case in outcome mapping.
+''');
+
+        final result = Process.runSync(
+          'dart',
+          [
+            'run',
+            'tool/release_changeset.dart',
+            'version-pr',
+            '--changesets-dir=${changesetsDir.path}',
+            '--workspace-root=${tempDir.path}',
+          ],
+        );
+
+        expect(result.exitCode, 0, reason: result.stderr.toString());
+        expect(result.stdout.toString(), contains('explicit_outcome'));
+        expect(result.stdout.toString(), contains('0.0.2'));
+
+        tempDir.deleteSync(recursive: true);
       });
     });
 

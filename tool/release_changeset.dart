@@ -4,7 +4,7 @@
 //   dart run tool/release_changeset.dart init --package=<name> --bump=<level> --summary="<text>"
 //   dart run tool/release_changeset.dart check --changed-files=<files> [--base=<sha> --head=<sha>]
 //   dart run tool/release_changeset.dart plan --format=markdown|json
-//   dart run tool/release_changeset.dart version-pr  (not implemented in slice one)
+//   dart run tool/release_changeset.dart version-pr
 //
 // This CLI is the release intent boundary. Candidates come ONLY from
 // changesets — validation expansion does not imply publication.
@@ -12,6 +12,7 @@
 import 'dart:io';
 
 import 'src/release_planner.dart';
+import 'src/version_editor.dart';
 
 const _defaultChangesetsDir = '.changesets';
 
@@ -31,13 +32,7 @@ Future<void> main(List<String> args) async {
     case 'plan':
       await _handlePlan(args.skip(1).toList());
     case 'version-pr':
-      stderr
-        ..writeln('ERROR: version-pr is not implemented in slice one.')
-        ..writeln(
-          'This subcommand will be available in slice two '
-          '(release-version PR workflow).',
-        );
-      exit(1);
+      await _handleVersionPr(args.skip(1).toList());
     default:
       stderr.writeln('Unknown subcommand: $subcommand');
       _printUsage();
@@ -78,6 +73,15 @@ void _printUsage() {
     ..writeln('  --format=markdown|json   Output format (default: markdown)')
     ..writeln(
       '  --changesets-dir=<path>  Changesets directory (default: .changesets)',
+    )
+    ..writeln()
+    ..writeln('Options for version-pr:')
+    ..writeln(
+      '  --changesets-dir=<path>  Changesets directory '
+      '(default: .changesets)',
+    )
+    ..writeln(
+      '  --workspace-root=<path>  Workspace root (default: current directory)',
     );
 }
 
@@ -243,6 +247,48 @@ Future<void> _handlePlan(List<String> args) async {
       ..writeln()
       ..writeln(plan.renderMarkdown());
   }
+}
+
+Future<void> _handleVersionPr(List<String> args) async {
+  final changesetsDir = _extractArg(args, 'changesets-dir').isEmpty
+      ? _defaultChangesetsDir
+      : _extractArg(args, 'changesets-dir');
+  final workspaceRoot = _extractArg(args, 'workspace-root').isEmpty
+      ? Directory.current.path
+      : _extractArg(args, 'workspace-root');
+
+  final changesets = _loadChangesets(changesetsDir);
+  final plan = ReleasePlanner.plan(changesets);
+
+  if (plan.candidates.isEmpty) {
+    stdout
+      ..writeln('=== Version PR ===')
+      ..writeln()
+      ..writeln('No release candidates — no changesets found.')
+      ..writeln()
+      ..writeln(
+        'Publish handoff: no publish in slice one — '
+        'tag-triggered OIDC publishing is planned for slice two.',
+      );
+    return;
+  }
+
+  stdout
+    ..writeln('=== Version PR ===')
+    ..writeln()
+    ..writeln('Applying version edits to: $workspaceRoot')
+    ..writeln('Candidates: ${plan.candidates.length}')
+    ..writeln();
+
+  final edits = VersionEditor.applyVersionEdits(plan, workspaceRoot);
+
+  for (final edit in edits) {
+    stdout.writeln('  ${edit.packageName}: ${edit.description}');
+  }
+
+  stdout
+    ..writeln()
+    ..writeln(plan.renderMarkdown());
 }
 
 List<Changeset> _loadChangesets(String dir) {

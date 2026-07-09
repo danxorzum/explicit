@@ -1,0 +1,124 @@
+name: Release Version PR
+
+# Opens or updates a release version PR that bumps package versions
+# and changelogs based on merged changesets.
+#
+# This workflow does NOT create tags or publish to pub.dev.
+# Tag-triggered OIDC publishing is planned for a future slice.
+
+concurrency:
+  group: release-version-pr
+  cancel-in-progress: false
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release_version_pr:
+    name: "Release version PR"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: "3.12.0"
+
+      - name: Install workspace dependencies
+        run: dart pub get
+
+      - name: Render release plan
+        run: |
+          echo "=== Release Plan ==="
+          dart run tool/release_changeset.dart plan --format=markdown
+          echo ""
+          echo "=== JSON Plan (for PR body) ==="
+          dart run tool/release_changeset.dart plan --format=json
+
+      - name: Check for release candidates
+        id: check_candidates
+        run: |
+          PLAN_JSON=$(dart run tool/release_changeset.dart plan --format=json)
+          CANDIDATE_COUNT=$(echo "$PLAN_JSON" | python3 -c "import sys, json; print(len(json.load(sys.stdin)['candidates']))")
+          echo "candidate_count=$CANDIDATE_COUNT" >> "$GITHUB_OUTPUT"
+          if [ "$CANDIDATE_COUNT" -eq 0 ]; then
+            echo "No release candidates found — skipping version PR."
+          else
+            echo "Found $CANDIDATE_COUNT release candidate(s)."
+          fi
+
+      - name: Apply version edits
+        if: steps.check_candidates.outputs.candidate_count != '0'
+        run: |
+          echo "=== Applying Version Edits ==="
+          dart run tool/release_changeset.dart version-pr
+          echo ""
+          echo "=== Version edits applied ==="
+          git diff --stat
+
+      - name: Generate PR body
+        if: steps.check_candidates.outputs.candidate_count != '0'
+        id: pr_body
+        run: |
+          PLAN_MD=$(dart run tool/release_changeset.dart plan --format=markdown)
+          {
+            echo "body<<EOF"
+            echo "$PLAN_MD"
+            echo ""
+            echo "---"
+            echo ""
+            echo "**No publish in slice one** — this workflow only updates"
+            echo "versions and changelogs. Tag-triggered OIDC publishing is"
+            echo "planned for a future slice."
+            echo ""
+            echo "After merging this PR, tags will be created manually or"
+            echo "by a future automation to trigger publishing."
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create or update release version PR
+        if: steps.check_candidates.outputs.candidate_count != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="automation/release-version"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH"
+          git add -A
+          git commit -m "chore(release): prepare package versions"
+          git push --force origin "$BRANCH"
+
+          # Check if PR already exists.
+          EXISTING_PR=$(gh pr list --head "$BRANCH" --base main --json number --jq '.[0].number // empty')
+
+          if [ -n "$EXISTING_PR" ]; then
+            echo "Updating existing PR #$EXISTING_PR"
+            gh pr edit "$EXISTING_PR" \
+              --title "chore(release): prepare package versions" \
+              --body "${{ steps.pr_body.outputs.body }}"
+          else
+            echo "Creating new release version PR"
+            gh pr create \
+              --title "chore(release): prepare package versions" \
+              --body "${{ steps.pr_body.outputs.body }}" \
+              --base main \
+              --head "$BRANCH"
+          fi
+
+      - name: Log handoff state
+        run: |
+          echo "=== Publish Handoff ==="
+          echo "Slice one: no publish — tag-triggered OIDC publishing"
+          echo "is planned for a future slice."
+          echo ""
+          echo "No tags created. No pub.dev upload performed."

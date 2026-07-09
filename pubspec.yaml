@@ -99,3 +99,11 @@ melos:
         Shows candidates, bumps, changelog notes, and dependency updates.
         Usage: melos run release:plan [-- --format=markdown|json]
       run: dart run tool/release_changeset.dart plan
+
+    release:version-pr:
+      description: >
+        Apply version and changelog edits to packages based on the release
+        plan. Updates pubspec.yaml versions, CHANGELOG.md entries, and
+        dependency caret ranges. Does not publish or create tags.
+        Usage: melos run release:version-pr
+      run: dart run tool/release_changeset.dart version-pr
