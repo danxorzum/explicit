@@ -414,6 +414,132 @@ dependencies:
         expect(edits, isEmpty);
       });
 
+      test('emits provenance manifest per candidate', () {
+        const plan = ReleasePlan(
+          candidates: [
+            ReleaseCandidate(
+              packageName: 'explicit_outcome',
+              bump: BumpLevel.minor,
+              notes: '- Add typed outcome API.',
+            ),
+            ReleaseCandidate(
+              packageName: 'explicit',
+              bump: BumpLevel.patch,
+              notes: '- Update re-exports.',
+            ),
+          ],
+          dependencyUpdates: [
+            DependencyUpdate(
+              packageName: 'explicit',
+              dependencyName: 'explicit_outcome',
+            ),
+          ],
+        );
+
+        // Create changesets dir with provenance source data.
+        final changesetsDir = Directory('${tempDir.path}/.changesets')
+          ..createSync();
+        File('${changesetsDir.path}/feature.md').writeAsStringSync('''
+---
+explicit_outcome: minor
+explicit: patch
+---
+
+- Add typed outcome API.
+- Update re-exports.
+''');
+
+        VersionEditor.applyVersionEdits(
+          plan,
+          tempDir.path,
+          changesetsDir: changesetsDir.path,
+        );
+
+        // Verify provenance manifests exist.
+        final outcomeProvenance = File(
+          '${changesetsDir.path}/releases/'
+          'explicit_outcome-0.1.0.json',
+        );
+        expect(
+          outcomeProvenance.existsSync(),
+          isTrue,
+          reason: 'Provenance manifest should be emitted for '
+              'explicit_outcome',
+        );
+
+        final explicitProvenance = File(
+          '${changesetsDir.path}/releases/explicit-0.0.2.json',
+        );
+        expect(
+          explicitProvenance.existsSync(),
+          isTrue,
+          reason: 'Provenance manifest should be emitted for explicit',
+        );
+
+        // Verify provenance content.
+        final outcomeProv = ReleaseProvenance.fromJson(
+          outcomeProvenance.readAsStringSync(),
+        );
+        expect(outcomeProv.packageName, 'explicit_outcome');
+        expect(outcomeProv.version, '0.1.0');
+        expect(outcomeProv.bump, 'minor');
+        expect(outcomeProv.changesetHashes, isNotEmpty);
+        expect(outcomeProv.changelogNotesHash, isNotEmpty);
+
+        final explicitProv = ReleaseProvenance.fromJson(
+          explicitProvenance.readAsStringSync(),
+        );
+        expect(explicitProv.packageName, 'explicit');
+        expect(explicitProv.version, '0.0.2');
+        expect(explicitProv.bump, 'patch');
+      });
+
+      test('provenance emission is idempotent', () {
+        const plan = ReleasePlan(
+          candidates: [
+            ReleaseCandidate(
+              packageName: 'explicit_outcome',
+              bump: BumpLevel.patch,
+              notes: '- Fix edge case.',
+            ),
+          ],
+          dependencyUpdates: [],
+        );
+
+        final changesetsDir = Directory('${tempDir.path}/.changesets')
+          ..createSync();
+        File('${changesetsDir.path}/fix.md').writeAsStringSync('''
+---
+explicit_outcome: patch
+---
+
+- Fix edge case.
+''');
+
+        // Run twice — should produce identical provenance.
+        VersionEditor.applyVersionEdits(
+          plan,
+          tempDir.path,
+          changesetsDir: changesetsDir.path,
+        );
+        final firstContent = File(
+          '${changesetsDir.path}/releases/'
+          'explicit_outcome-0.0.2.json',
+        ).readAsStringSync();
+
+        VersionEditor.applyVersionEdits(
+          plan,
+          tempDir.path,
+          changesetsDir: changesetsDir.path,
+        );
+        final secondContent = File(
+          '${changesetsDir.path}/releases/'
+          'explicit_outcome-0.0.2.json',
+        ).readAsStringSync();
+
+        expect(firstContent, secondContent);
+      });
+
       test('maintains publish order: explicit_outcome edited first', () {
         const plan = ReleasePlan(
           candidates: [

@@ -3,6 +3,9 @@
 ///
 /// This module is the boundary for release intent. Candidates come ONLY
 /// from changesets — validation expansion does not imply publication.
+///
+/// Slice 3 adds: release provenance, tag parsing/validation,
+/// dependency preflight, and major release detection.
 library;
 
 import 'dart:convert';
@@ -235,8 +238,8 @@ class ReleasePlan {
     if (candidates.isEmpty) {
       return '## Release Plan\n\n'
           'No release candidates.\n\n'
-          'Publish handoff: no publish in slice one — '
-          'tag-triggered OIDC publishing is planned for slice two.';
+          'Publish handoff: tag-triggered OIDC publishing is available '
+          'via the publish workflow (publish.yaml).';
     }
 
     final buffer = StringBuffer()
@@ -274,8 +277,8 @@ class ReleasePlan {
     buffer
       ..writeln()
       ..writeln(
-        'Publish handoff: no publish in slice one — '
-        'tag-triggered OIDC publishing is planned for slice two.',
+        'Publish handoff: tag-triggered OIDC publishing is available '
+        'via the publish workflow (publish.yaml).',
       );
 
     return buffer.toString();
@@ -301,7 +304,7 @@ class ReleasePlan {
             },
           )
           .toList(),
-      'publishHandoff': 'slice-one: no publish; slice-two: tag-triggered OIDC',
+      'publishHandoff': 'tag-triggered OIDC publishing via publish.yaml',
     };
     return const JsonEncoder.withIndent('  ').convert(data);
   }
@@ -415,5 +418,590 @@ class ReleasePlanner {
       missingPackages: missing,
       remediation: remediationLines.join('\n'),
     );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Slice 3: Provenance, Tag Validation, Preflight, Major Detection
+// ---------------------------------------------------------------------------
+
+/// Release provenance manifest committed during version-pr.
+///
+/// Records the package, version, bump level, source changeset identifiers
+/// (content hashes), and a hash of the changelog notes. Publish validation
+/// requires this manifest to exist and agree with tag/pubspec/changelog.
+class ReleaseProvenance {
+  const ReleaseProvenance({
+    required this.packageName,
+    required this.version,
+    required this.bump,
+    required this.changesetHashes,
+    required this.changelogNotesHash,
+  });
+
+  /// Parses provenance from a JSON string.
+  ///
+  /// Throws [FormatException] on malformed JSON or missing fields.
+  factory ReleaseProvenance.fromJson(String jsonStr) {
+    final dynamic decoded;
+    try {
+      decoded = jsonDecode(jsonStr);
+    } on FormatException {
+      throw const FormatException(
+        'Provenance manifest is not valid JSON.',
+      );
+    }
+
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException(
+        'Provenance manifest must be a JSON object.',
+      );
+    }
+
+    final pkg = decoded['package'] as String?;
+    final ver = decoded['version'] as String?;
+    final bump = decoded['bump'] as String?;
+    final hashes = decoded['changesetHashes'] as List<dynamic>?;
+    final notesHash = decoded['changelogNotesHash'] as String?;
+
+    if (pkg == null ||
+        ver == null ||
+        bump == null ||
+        hashes == null ||
+        notesHash == null) {
+      throw const FormatException(
+        'Provenance manifest is missing required fields '
+        '(package, version, bump, changesetHashes, changelogNotesHash).',
+      );
+    }
+
+    return ReleaseProvenance(
+      packageName: pkg,
+      version: ver,
+      bump: bump,
+      changesetHashes: hashes.cast<String>(),
+      changelogNotesHash: notesHash,
+    );
+  }
+
+  /// Package name this provenance belongs to.
+  final String packageName;
+
+  /// Release version.
+  final String version;
+
+  /// Bump level name (patch, minor, major).
+  final String bump;
+
+  /// Content hashes of source changesets that produced this release.
+  final List<String> changesetHashes;
+
+  /// Hash of the changelog notes for this release.
+  final String changelogNotesHash;
+
+  /// Serializes provenance to deterministic JSON.
+  String toJson() {
+    final data = {
+      'package': packageName,
+      'version': version,
+      'bump': bump,
+      'changesetHashes': changesetHashes,
+      'changelogNotesHash': changelogNotesHash,
+    };
+    return const JsonEncoder.withIndent('  ').convert(data);
+  }
+
+  /// Computes a deterministic content hash for a given string.
+  ///
+  /// Uses a simple FNV-1a inspired hash for deterministic, dependency-free
+  /// hashing suitable for content integrity checks (not cryptographic).
+  static String computeContentHash(String content) {
+    var hash = 0x811c9dc5;
+    for (final codeUnit in content.codeUnits) {
+      hash ^= codeUnit;
+      hash = (hash * 0x01000193) & 0xFFFFFFFF;
+    }
+    return hash.toRadixString(16).padLeft(8, '0');
+  }
+}
+
+/// Parsed release tag with package name and version.
+class TagInfo {
+  const TagInfo({required this.packageName, required this.version});
+
+  /// Package name extracted from the tag.
+  final String packageName;
+
+  /// Semantic version extracted from the tag (without the `v` prefix).
+  final String version;
+}
+
+/// Parses and validates release tags.
+///
+/// Tag contract: `<package>/v<semver>`, limited to `explicit_outcome`
+/// and `explicit`. Rejects unknown packages, malformed semver, and
+/// ambiguous formats.
+class TagParser {
+  /// Known publishable package names.
+  static const List<String> _allowedPackages = [
+    'explicit_outcome',
+    'explicit',
+  ];
+
+  /// Parses a release tag string into a [TagInfo].
+  ///
+  /// Throws [FormatException] if the tag does not match the contract.
+  static TagInfo parse(String tag) {
+    if (tag.isEmpty) {
+      throw const FormatException(
+        'Release tag is empty. Expected <package>/v<semver>.',
+      );
+    }
+
+    final slashIndex = tag.indexOf('/');
+    if (slashIndex == -1) {
+      throw FormatException(
+        'Release tag "$tag" is missing the "/" separator. '
+        'Expected format: <package>/v<semver>.',
+      );
+    }
+
+    final packageName = tag.substring(0, slashIndex);
+    final versionPart = tag.substring(slashIndex + 1);
+
+    if (!_allowedPackages.contains(packageName)) {
+      throw FormatException(
+        'Unknown package "$packageName" in tag "$tag". '
+        'Allowed packages: ${_allowedPackages.join(', ')}.',
+      );
+    }
+
+    if (!versionPart.startsWith('v')) {
+      throw FormatException(
+        'Version part "$versionPart" in tag "$tag" must start with "v". '
+        'Expected format: <package>/v<semver>.',
+      );
+    }
+
+    final version = versionPart.substring(1);
+    _validateSemver(version, tag);
+
+    return TagInfo(packageName: packageName, version: version);
+  }
+
+  /// Validates that [version] is a valid semver string.
+  ///
+  /// Accepts `major.minor.patch` with optional pre-release suffix.
+  static void _validateSemver(String version, String originalTag) {
+    // Split off pre-release suffix if present.
+    final corePart = version.contains('-')
+        ? version.substring(0, version.indexOf('-'))
+        : version;
+
+    final parts = corePart.split('.');
+    if (parts.length != 3) {
+      throw FormatException(
+        'Version "$version" in tag "$originalTag" is not valid semver. '
+        'Expected major.minor.patch (e.g., 1.2.3).',
+      );
+    }
+
+    for (final part in parts) {
+      if (int.tryParse(part) == null) {
+        throw FormatException(
+          'Version "$version" in tag "$originalTag" has non-numeric '
+          'component "$part". Each semver part must be a non-negative '
+          'integer.',
+        );
+      }
+    }
+  }
+}
+
+/// Result of a release validation check.
+class ReleaseValidation {
+  const ReleaseValidation({
+    required this.isValid,
+    required this.errors,
+    required this.packageName,
+    required this.version,
+    required this.isMajor,
+  });
+
+  /// Whether the release passed all validation gates.
+  final bool isValid;
+
+  /// Validation error messages (empty when [isValid] is true).
+  final List<String> errors;
+
+  /// Package name from the tag (always populated if tag parsed).
+  final String packageName;
+
+  /// Version from the tag (always populated if tag parsed).
+  final String version;
+
+  /// Whether this is a major release.
+  final bool isMajor;
+}
+
+/// Validates a release tag against pubspec, changelog, and provenance.
+///
+/// All four sources must agree on package name and version.
+/// Fails closed on absent or malformed provenance.
+///
+/// When a metadata fetcher is provided and the package is `explicit`,
+/// runs dependency preflight to verify `explicit_outcome` availability.
+class ReleaseValidator {
+  /// Validates a release from its tag, pubspec, changelog, and provenance.
+  ///
+  /// [provenanceJson] may be null (absent provenance fails closed).
+  /// [metadataFetcher] is optional; when provided, enables dependency
+  /// preflight for `explicit` package validation.
+  static ReleaseValidation validateRelease({
+    required String tag,
+    required String pubspecContent,
+    required String changelogContent,
+    required String? provenanceJson,
+    PubDevMetadata Function(String packageName)? metadataFetcher,
+  }) {
+    final errors = <String>[];
+
+    // Parse the tag.
+    final TagInfo tagInfo;
+    try {
+      tagInfo = TagParser.parse(tag);
+    } on FormatException catch (e) {
+      return ReleaseValidation(
+        isValid: false,
+        errors: ['Tag parse failed: ${e.message}'],
+        packageName: '',
+        version: '',
+        isMajor: false,
+      );
+    }
+
+    // Read pubspec version.
+    final pubspecVersion = _readVersionFromPubspec(pubspecContent);
+    if (pubspecVersion == null) {
+      errors.add(
+        'Pubspec version not found for ${tagInfo.packageName}.',
+      );
+    } else if (pubspecVersion != tagInfo.version) {
+      errors.add(
+        'Version mismatch: tag says ${tagInfo.version}, '
+        'pubspec says $pubspecVersion.',
+      );
+    }
+
+    // Check changelog heading.
+    final hasChangelogHeading = changelogContent.contains(
+      '## ${tagInfo.version}',
+    );
+    if (!hasChangelogHeading) {
+      errors.add(
+        'changelog heading "## ${tagInfo.version}" not found '
+        'in ${tagInfo.packageName} CHANGELOG.md.',
+      );
+    }
+
+    // Validate provenance (fail closed).
+    String? provenanceBump;
+    if (provenanceJson == null) {
+      errors.add(
+        'Release provenance manifest is absent for '
+        '${tagInfo.packageName}/v${tagInfo.version}. '
+        'Provenance is required for publish validation',
+      );
+    } else {
+      final ReleaseProvenance provenance;
+      try {
+        provenance = ReleaseProvenance.fromJson(provenanceJson);
+      } on FormatException catch (e) {
+        errors.add(
+          'Release provenance manifest is malformed for '
+          '${tagInfo.packageName}/v${tagInfo.version}: ${e.message}',
+        );
+        return ReleaseValidation(
+          isValid: false,
+          errors: errors,
+          packageName: tagInfo.packageName,
+          version: tagInfo.version,
+          isMajor: false,
+        );
+      }
+
+      if (provenance.packageName != tagInfo.packageName) {
+        errors.add(
+          'Provenance package "${provenance.packageName}" does not '
+          'match tag package "${tagInfo.packageName}".',
+        );
+      }
+      if (provenance.version != tagInfo.version) {
+        errors.add(
+          'Provenance version "${provenance.version}" does not '
+          'match tag version "${tagInfo.version}".',
+        );
+      }
+
+      // Extract provenance bump for major detection.
+      provenanceBump = provenance.bump;
+    }
+
+    // Detect major release using provenance bump (primary source).
+    final isMajor = MajorDetector.isMajorRelease(
+      tagVersion: tagInfo.version,
+      pubspecContent: pubspecContent,
+      provenanceBump: provenanceBump,
+    );
+
+    // Run dependency preflight for `explicit` package.
+    if (tagInfo.packageName == 'explicit' && metadataFetcher != null) {
+      final preflight = DependencyPreflight.check(
+        explicitPubspecContent: pubspecContent,
+        metadataFetcher: metadataFetcher,
+      );
+      if (!preflight.isSatisfied) {
+        errors.addAll(preflight.errors);
+      }
+    }
+
+    return ReleaseValidation(
+      isValid: errors.isEmpty,
+      errors: errors,
+      packageName: tagInfo.packageName,
+      version: tagInfo.version,
+      isMajor: isMajor,
+    );
+  }
+
+  /// Reads the `version:` field from pubspec content.
+  static String? _readVersionFromPubspec(String pubspecContent) {
+    for (final line in pubspecContent.split('\n')) {
+      if (line.startsWith('version:') || line.startsWith('version :')) {
+        final colonIdx = line.indexOf(':');
+        return line.substring(colonIdx + 1).trim();
+      }
+    }
+    return null;
+  }
+}
+
+/// Detects whether a release tag represents a major version bump.
+///
+/// Primary detection uses the provenance `bump` field (committed during
+/// version-pr). Falls back to comparing tag major vs pubspec major when
+/// provenance is unavailable (legacy path).
+class MajorDetector {
+  /// Returns true if the release is a major version bump.
+  ///
+  /// When [provenanceBump] is provided (normal path), uses it directly:
+  /// `major` → true, anything else → false.
+  ///
+  /// When [provenanceBump] is null (fallback), compares tag major to
+  /// pubspec major: strictly greater → true.
+  static bool isMajorRelease({
+    required String tagVersion,
+    required String pubspecContent,
+    String? provenanceBump,
+  }) {
+    // Primary: use provenance bump (authoritative source).
+    if (provenanceBump != null) {
+      return provenanceBump == 'major';
+    }
+
+    // Fallback: compare tag major to pubspec major.
+    final tagMajor = _parseMajor(tagVersion);
+    final pubspecVersion = _readVersionFromPubspec(pubspecContent);
+    if (pubspecVersion == null || tagMajor == null) return false;
+
+    final pubspecMajor = _parseMajor(pubspecVersion);
+    if (pubspecMajor == null) return false;
+
+    return tagMajor > pubspecMajor;
+  }
+
+  /// Extracts the major version number from a semver string.
+  static int? _parseMajor(String version) {
+    final corePart = version.contains('-')
+        ? version.substring(0, version.indexOf('-'))
+        : version;
+    final parts = corePart.split('.');
+    if (parts.isEmpty) return null;
+    return int.tryParse(parts[0]);
+  }
+
+  /// Reads the `version:` field from pubspec content.
+  static String? _readVersionFromPubspec(String pubspecContent) {
+    for (final line in pubspecContent.split('\n')) {
+      if (line.startsWith('version:') || line.startsWith('version :')) {
+        final colonIdx = line.indexOf(':');
+        return line.substring(colonIdx + 1).trim();
+      }
+    }
+    return null;
+  }
+}
+
+/// Pub.dev package metadata for dependency preflight.
+///
+/// Injectable for testing — production code fetches from pub.dev API,
+/// tests inject deterministic fixtures.
+class PubDevMetadata {
+  const PubDevMetadata({
+    required this.packageName,
+    required this.versions,
+  });
+
+  /// Package name on pub.dev.
+  final String packageName;
+
+  /// All published versions.
+  final List<String> versions;
+}
+
+/// Result of a dependency preflight check.
+class PreflightResult {
+  const PreflightResult({
+    required this.isSatisfied,
+    required this.errors,
+  });
+
+  /// Whether the dependency constraint is satisfied.
+  final bool isSatisfied;
+
+  /// Error messages (empty when [isSatisfied] is true).
+  final List<String> errors;
+}
+
+/// Preflight check: verifies that `explicit`'s dependency on
+/// `explicit_outcome` is satisfied by published versions on pub.dev.
+///
+/// Fails closed on metadata/network errors. Metadata fetching is
+/// injectable for deterministic testing.
+class DependencyPreflight {
+  /// Checks whether the required `explicit_outcome` version exists
+  /// on pub.dev before allowing `explicit` to publish.
+  ///
+  /// [metadataFetcher] is a function that returns metadata for a given
+  /// package name. Tests inject fixtures; production uses pub.dev API.
+  static PreflightResult check({
+    required String explicitPubspecContent,
+    required PubDevMetadata Function(String packageName) metadataFetcher,
+  }) {
+    // Read the explicit_outcome constraint from explicit's pubspec.
+    final constraint = _readDependencyConstraint(
+      explicitPubspecContent,
+      'explicit_outcome',
+    );
+
+    // If explicit doesn't depend on explicit_outcome, skip preflight.
+    if (constraint == null) {
+      return const PreflightResult(isSatisfied: true, errors: []);
+    }
+
+    // Fetch pub.dev metadata (fail closed on errors).
+    final PubDevMetadata metadata;
+    try {
+      metadata = metadataFetcher('explicit_outcome');
+    } on Exception catch (e) {
+      final msg = 'Failed to fetch pub.dev metadata for '
+          'explicit_outcome: $e. Failing closed — cannot '
+          'verify dependency availability.';
+      return PreflightResult(
+        isSatisfied: false,
+        errors: [msg],
+      );
+    }
+
+    // Check if the required version exists and satisfies the constraint.
+    final requiredVersion = _extractCaretVersion(constraint);
+    if (requiredVersion == null) {
+      return const PreflightResult(isSatisfied: true, errors: []);
+    }
+
+    final hasVersion = metadata.versions.contains(requiredVersion);
+    if (!hasVersion) {
+      // Also check if any version satisfies the caret constraint.
+      final satisfying = metadata.versions.where(
+        (v) => _satisfiesCaret(v, requiredVersion),
+      );
+      if (satisfying.isEmpty) {
+        final msg = 'No published version of explicit_outcome '
+            'satisfies constraint ^$requiredVersion. '
+            'explicit_outcome must be published before explicit.';
+        return PreflightResult(
+          isSatisfied: false,
+          errors: [msg],
+        );
+      }
+    }
+
+    return const PreflightResult(isSatisfied: true, errors: []);
+  }
+
+  /// Reads a dependency constraint from pubspec content.
+  ///
+  /// Returns the constraint string (e.g., "^0.1.0") or null if
+  /// the dependency is not declared.
+  static String? _readDependencyConstraint(
+    String pubspecContent,
+    String dependencyName,
+  ) {
+    for (final line in pubspecContent.split('\n')) {
+      final trimmed = line.trimLeft();
+      if (trimmed.startsWith('$dependencyName:') ||
+          trimmed.startsWith('$dependencyName :')) {
+        final colonIdx = trimmed.indexOf(':');
+        return trimmed.substring(colonIdx + 1).trim();
+      }
+    }
+    return null;
+  }
+
+  /// Extracts the version from a caret constraint like "^0.1.0".
+  static String? _extractCaretVersion(String constraint) {
+    if (constraint.startsWith('^')) {
+      return constraint.substring(1);
+    }
+    return null;
+  }
+
+  /// Checks if [version] satisfies a caret constraint `^[baseVersion]`.
+  ///
+  /// Caret means: >= baseVersion and < next breaking version.
+  static bool _satisfiesCaret(String version, String baseVersion) {
+    final vParts = version.split('.');
+    final bParts = baseVersion.split('.');
+    if (vParts.length < 3 || bParts.length < 3) return false;
+
+    final vMajor = int.tryParse(vParts[0]);
+    final vMinor = int.tryParse(vParts[1]);
+    final vPatch = int.tryParse(vParts[2]);
+    final bMajor = int.tryParse(bParts[0]);
+    final bMinor = int.tryParse(bParts[1]);
+    final bPatch = int.tryParse(bParts[2]);
+
+    if (vMajor == null ||
+        vMinor == null ||
+        vPatch == null ||
+        bMajor == null ||
+        bMinor == null ||
+        bPatch == null) {
+      return false;
+    }
+
+    // Must be >= base version.
+    if (vMajor < bMajor) return false;
+    if (vMajor == bMajor && vMinor < bMinor) return false;
+    if (vMajor == bMajor && vMinor == bMinor && vPatch < bPatch) return false;
+
+    // Must be < next breaking version.
+    if (bMajor > 0) {
+      return vMajor == bMajor;
+    } else if (bMinor > 0) {
+      return vMajor == 0 && vMinor == bMinor;
+    } else {
+      return vMajor == 0 && vMinor == 0 && vPatch == bPatch;
+    }
   }
 }

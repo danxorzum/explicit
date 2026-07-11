@@ -1,0 +1,119 @@
+# Publish — tag-triggered pub.dev trusted publishing via GitHub OIDC.
+#
+# Maintainer setup assumptions:
+#   - Configure pub.dev trusted publishing for each package
+#     (explicit_outcome and explicit). First manual upload may be
+#     required by pub.dev before trusted publishing is available.
+#   - Tag pattern: <package>/v<semver>
+#     e.g. explicit_outcome/v0.1.0, explicit/v0.0.2
+#   - Create protected GitHub Environment "release-major" for major
+#     release approval. Major publish jobs wait for this environment.
+#   - No long-lived pub.dev credentials are needed or used.
+#     Publishing relies solely on OIDC trusted publishing.
+#   - Publish order: explicit_outcome before explicit when both
+#     release tags are pushed.
+#
+# Rollback: delete this workflow and remove the safety allowlist entry
+# in tool/src/publish_safety.dart. Version PR automation and changeset
+# CI remain publish-free and unaffected.
+
+name: Publish
+
+on:
+  push:
+    tags:
+      - 'explicit_outcome/v*'
+      - 'explicit/v*'
+
+permissions:
+  contents: read
+
+jobs:
+  # Job 1: Validate release tag against pubspec, changelog, provenance.
+  # No OIDC, no Environment, no publish permissions.
+  validate_release:
+    name: "Validate release tag"
+    runs-on: ubuntu-latest
+    outputs:
+      package: ${{ steps.validate.outputs.package }}
+      version: ${{ steps.validate.outputs.version }}
+      major: ${{ steps.validate.outputs.major }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: "3.12.0"
+
+      - name: Install workspace dependencies
+        run: dart pub get
+
+      - name: Validate release tag
+        id: validate
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          echo "Validating tag: $TAG"
+          RESULT=$(dart run tool/release_changeset.dart validate-release --tag="$TAG")
+          echo "$RESULT"
+
+          # Parse outputs from validate-release JSON.
+          PACKAGE=$(echo "$RESULT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d['package'])")
+          VERSION=$(echo "$RESULT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d['version'])")
+          MAJOR=$(echo "$RESULT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(str(d['isMajor']).lower())")
+
+          echo "package=$PACKAGE" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "major=$MAJOR" >> "$GITHUB_OUTPUT"
+
+          echo "Validated: $PACKAGE v$VERSION (major=$MAJOR)"
+
+  # Job 2: Publish patch/minor releases via OIDC trusted publishing.
+  # Runs only when the release is NOT a major version.
+  publish_patch_minor:
+    name: "Publish patch/minor"
+    needs: validate_release
+    if: needs.validate_release.outputs.major == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: "3.12.0"
+
+      - name: Install workspace dependencies
+        run: dart pub get
+
+      - name: Publish ${{ needs.validate_release.outputs.package }}
+        working-directory: packages/${{ needs.validate_release.outputs.package }}
+        run: dart pub publish
+
+  # Job 3: Publish major releases via OIDC trusted publishing.
+  # Requires approval on the protected "release-major" Environment.
+  publish_major:
+    name: "Publish major"
+    needs: validate_release
+    if: needs.validate_release.outputs.major == 'true'
+    runs-on: ubuntu-latest
+    environment: release-major
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: "3.12.0"
+
+      - name: Install workspace dependencies
+        run: dart pub get
+
+      - name: Publish ${{ needs.validate_release.outputs.package }}
+        working-directory: packages/${{ needs.validate_release.outputs.package }}
+        run: dart pub publish

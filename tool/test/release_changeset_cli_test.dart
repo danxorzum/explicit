@@ -580,6 +580,281 @@ explicit_outcome: patch
       });
     });
 
+    group('validate-release subcommand', () {
+      test('passes when tag, pubspec, changelog, provenance agree', () {
+        final tempDir =
+            Directory.systemTemp.createTempSync('validate_release_');
+
+        // Create workspace.
+        Directory('${tempDir.path}/packages/explicit_outcome')
+            .createSync(recursive: true);
+
+        File('${tempDir.path}/packages/explicit_outcome/pubspec.yaml')
+            .writeAsStringSync('''
+name: explicit_outcome
+version: 0.1.0
+description: Dart typed outcomes.
+''');
+
+        File('${tempDir.path}/packages/explicit_outcome/CHANGELOG.md')
+            .writeAsStringSync('''
+# Changelog
+
+## 0.1.0 (2026-07-09)
+
+- Add typed outcome API.
+
+## 0.0.1
+
+- Initial release.
+''');
+
+        // Create provenance manifest.
+        final releasesDir =
+            Directory('${tempDir.path}/.changesets/releases')
+              ..createSync(recursive: true);
+        File('${releasesDir.path}/explicit_outcome-0.1.0.json')
+            .writeAsStringSync('''
+{
+  "package": "explicit_outcome",
+  "version": "0.1.0",
+  "bump": "minor",
+  "changesetHashes": ["abc"],
+  "changelogNotesHash": "def"
+}
+''');
+
+        final result = Process.runSync(
+          'dart',
+          [
+            'run',
+            'tool/release_changeset.dart',
+            'validate-release',
+            '--tag=explicit_outcome/v0.1.0',
+            '--workspace-root=${tempDir.path}',
+            '--changesets-dir=${tempDir.path}/.changesets',
+          ],
+        );
+
+        expect(result.exitCode, 0, reason: result.stderr.toString());
+        expect(result.stdout.toString(), contains('explicit_outcome'));
+        expect(result.stdout.toString(), contains('0.1.0'));
+
+        tempDir.deleteSync(recursive: true);
+      });
+
+      test('fails closed when provenance is absent', () {
+        final tempDir =
+            Directory.systemTemp.createTempSync('validate_release_');
+
+        Directory('${tempDir.path}/packages/explicit_outcome')
+            .createSync(recursive: true);
+
+        File('${tempDir.path}/packages/explicit_outcome/pubspec.yaml')
+            .writeAsStringSync('''
+name: explicit_outcome
+version: 0.1.0
+description: Dart typed outcomes.
+''');
+
+        File('${tempDir.path}/packages/explicit_outcome/CHANGELOG.md')
+            .writeAsStringSync('''
+# Changelog
+
+## 0.1.0 (2026-07-09)
+
+- Feature.
+''');
+
+        // No provenance manifest created.
+        Directory('${tempDir.path}/.changesets').createSync();
+
+        final result = Process.runSync(
+          'dart',
+          [
+            'run',
+            'tool/release_changeset.dart',
+            'validate-release',
+            '--tag=explicit_outcome/v0.1.0',
+            '--workspace-root=${tempDir.path}',
+            '--changesets-dir=${tempDir.path}/.changesets',
+          ],
+        );
+
+        expect(result.exitCode, isNot(0));
+        expect(result.stdout.toString(), contains('provenance'));
+
+        tempDir.deleteSync(recursive: true);
+      });
+
+      test('fails on invalid tag format', () {
+        final result = Process.runSync(
+          'dart',
+          [
+            'run',
+            'tool/release_changeset.dart',
+            'validate-release',
+            '--tag=unknown_pkg/v1.0.0',
+          ],
+        );
+
+        expect(result.exitCode, isNot(0));
+        expect(result.stderr.toString(), contains('Unknown package'));
+      });
+
+      test('fails when --tag is missing', () {
+        final result = Process.runSync(
+          'dart',
+          [
+            'run',
+            'tool/release_changeset.dart',
+            'validate-release',
+          ],
+        );
+
+        expect(result.exitCode, isNot(0));
+        expect(result.stderr.toString(), contains('--tag'));
+      });
+
+      // Regression: stdout must be JSON-only for workflow consumption.
+      test('stdout is parseable JSON with no extra text on success', () {
+        final tempDir =
+            Directory.systemTemp.createTempSync('validate_release_');
+
+        Directory('${tempDir.path}/packages/explicit_outcome')
+            .createSync(recursive: true);
+
+        File('${tempDir.path}/packages/explicit_outcome/pubspec.yaml')
+            .writeAsStringSync('''
+name: explicit_outcome
+version: 0.1.0
+description: Dart typed outcomes.
+''');
+
+        File('${tempDir.path}/packages/explicit_outcome/CHANGELOG.md')
+            .writeAsStringSync('''
+# Changelog
+
+## 0.1.0 (2026-07-09)
+
+- Add typed outcome API.
+
+## 0.0.1
+
+- Initial release.
+''');
+
+        final releasesDir =
+            Directory('${tempDir.path}/.changesets/releases')
+              ..createSync(recursive: true);
+        File('${releasesDir.path}/explicit_outcome-0.1.0.json')
+            .writeAsStringSync('''
+{
+  "package": "explicit_outcome",
+  "version": "0.1.0",
+  "bump": "minor",
+  "changesetHashes": ["abc"],
+  "changelogNotesHash": "def"
+}
+''');
+
+        final result = Process.runSync(
+          'dart',
+          [
+            'run',
+            'tool/release_changeset.dart',
+            'validate-release',
+            '--tag=explicit_outcome/v0.1.0',
+            '--workspace-root=${tempDir.path}',
+            '--changesets-dir=${tempDir.path}/.changesets',
+          ],
+        );
+
+        expect(result.exitCode, 0, reason: result.stderr.toString());
+
+        // stdout must be parseable JSON — no banners, no extra text.
+        final stdoutStr = result.stdout.toString().trim();
+        final dynamic decoded;
+        try {
+          decoded = jsonDecode(stdoutStr);
+        } on FormatException catch (e) {
+          fail(
+            'stdout is not valid JSON. '
+            'Workflow parses stdout directly, so no extra text allowed.\n'
+            'stdout was:\n$stdoutStr\n'
+            'Parse error: $e',
+          );
+        }
+        expect(decoded, isA<Map<String, dynamic>>());
+        final jsonResult = decoded as Map<String, dynamic>;
+        expect(jsonResult['isValid'], isTrue);
+        expect(jsonResult['package'], 'explicit_outcome');
+        expect(jsonResult['version'], '0.1.0');
+
+        tempDir.deleteSync(recursive: true);
+      });
+
+      // Regression: stdout must be parseable JSON on failure too.
+      test('stdout is parseable JSON on validation failure', () {
+        final tempDir =
+            Directory.systemTemp.createTempSync('validate_release_');
+
+        Directory('${tempDir.path}/packages/explicit_outcome')
+            .createSync(recursive: true);
+
+        File('${tempDir.path}/packages/explicit_outcome/pubspec.yaml')
+            .writeAsStringSync('''
+name: explicit_outcome
+version: 0.1.0
+description: Dart typed outcomes.
+''');
+
+        File('${tempDir.path}/packages/explicit_outcome/CHANGELOG.md')
+            .writeAsStringSync('''
+# Changelog
+
+## 0.1.0 (2026-07-09)
+
+- Feature.
+''');
+
+        // No provenance manifest — should fail closed.
+        Directory('${tempDir.path}/.changesets').createSync();
+
+        final result = Process.runSync(
+          'dart',
+          [
+            'run',
+            'tool/release_changeset.dart',
+            'validate-release',
+            '--tag=explicit_outcome/v0.1.0',
+            '--workspace-root=${tempDir.path}',
+            '--changesets-dir=${tempDir.path}/.changesets',
+          ],
+        );
+
+        expect(result.exitCode, isNot(0));
+
+        // stdout must be parseable JSON even on failure.
+        final stdoutStr = result.stdout.toString().trim();
+        final dynamic decoded;
+        try {
+          decoded = jsonDecode(stdoutStr);
+        } on FormatException catch (e) {
+          fail(
+            'stdout is not valid JSON on failure path.\n'
+            'stdout was:\n$stdoutStr\n'
+            'Parse error: $e',
+          );
+        }
+        expect(decoded, isA<Map<String, dynamic>>());
+        final jsonResult = decoded as Map<String, dynamic>;
+        expect(jsonResult['isValid'], isFalse);
+
+        tempDir.deleteSync(recursive: true);
+      });
+    });
+
     group('unknown subcommand', () {
       test('shows usage and exits non-zero', () {
         final result = Process.runSync(

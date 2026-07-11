@@ -4,7 +4,7 @@ import '../src/publish_safety.dart';
 
 void main() {
   group('PublishSafety', () {
-    group('assertSafeContent', () {
+    group('assertSafeContent (default — no workflow/job context)', () {
       test('passes for safe content with no forbidden commands', () {
         const safeContent = '''
 // This is a safe publish simulation
@@ -69,7 +69,7 @@ final creds = Platform.environment['PUB_CREDENTIALS'];
         );
       });
 
-      test('detects OIDC permission patterns', () {
+      test('detects OIDC permission patterns (default context)', () {
         const unsafeContent = '''
 permissions:
   id-token: write
@@ -126,6 +126,378 @@ Process.run('dart', ['pub', 'publish', '--force'], ...);
         expect(result.isSafe, isTrue);
         expect(result.violations, isEmpty);
       });
+    });
+
+    group('assertSafeContent with workflow/job allowlist', () {
+      test(
+        'allows id-token: write in publish.yaml::publish_patch_minor',
+        () {
+          const content = '''
+permissions:
+  id-token: write
+  contents: read
+''';
+          final result = PublishSafety.assertSafeContent(
+            content,
+            workflow: 'publish.yaml',
+            job: 'publish_patch_minor',
+          );
+          expect(result.isSafe, isTrue);
+        },
+      );
+
+      test('allows id-token: write in publish.yaml::publish_major', () {
+        const content = '''
+permissions:
+  id-token: write
+  contents: read
+''';
+        final result = PublishSafety.assertSafeContent(
+          content,
+          workflow: 'publish.yaml',
+          job: 'publish_major',
+        );
+        expect(result.isSafe, isTrue);
+      });
+
+      test('allows dart pub publish in publish.yaml::publish_patch_minor', () {
+        const content = '''
+run: dart pub publish
+''';
+        final result = PublishSafety.assertSafeContent(
+          content,
+          workflow: 'publish.yaml',
+          job: 'publish_patch_minor',
+        );
+        // dart pub publish (without --force) is allowed in the publish job.
+        expect(
+          result.violations.where(
+            (v) => v.rule == PublishSafety.noForcePublishRule,
+          ),
+          isEmpty,
+        );
+      });
+
+      test('allows dart pub publish in publish.yaml::publish_major', () {
+        const content = '''
+run: dart pub publish
+''';
+        final result = PublishSafety.assertSafeContent(
+          content,
+          workflow: 'publish.yaml',
+          job: 'publish_major',
+        );
+        expect(
+          result.violations.where(
+            (v) => v.rule == PublishSafety.noForcePublishRule,
+          ),
+          isEmpty,
+        );
+      });
+
+      test('denies id-token: write in publish.yaml::validate_release', () {
+        const content = '''
+permissions:
+  id-token: write
+''';
+        final result = PublishSafety.assertSafeContent(
+          content,
+          workflow: 'publish.yaml',
+          job: 'validate_release',
+        );
+        expect(result.isSafe, isFalse);
+        expect(
+          result.violations.any((v) => v.rule == PublishSafety.noOidcRule),
+          isTrue,
+        );
+      });
+
+      test('denies id-token: write in release_version_pr.yaml', () {
+        const content = '''
+permissions:
+  id-token: write
+''';
+        final result = PublishSafety.assertSafeContent(
+          content,
+          workflow: 'release_version_pr.yaml',
+          job: 'release_version_pr',
+        );
+        expect(result.isSafe, isFalse);
+      });
+
+      test('denies id-token: write in ci.yaml', () {
+        const content = '''
+permissions:
+  id-token: write
+''';
+        final result = PublishSafety.assertSafeContent(
+          content,
+          workflow: 'ci.yaml',
+          job: 'quality_gate',
+        );
+        expect(result.isSafe, isFalse);
+      });
+
+      test('denies id-token: write in publish_simulation.yaml', () {
+        const content = '''
+permissions:
+  id-token: write
+''';
+        final result = PublishSafety.assertSafeContent(
+          content,
+          workflow: 'publish_simulation.yaml',
+          job: 'publish_simulation',
+        );
+        expect(result.isSafe, isFalse);
+      });
+
+      test('denies id-token: write in unknown workflow', () {
+        const content = '''
+permissions:
+  id-token: write
+''';
+        final result = PublishSafety.assertSafeContent(
+          content,
+          workflow: 'custom_deploy.yaml',
+          job: 'deploy',
+        );
+        expect(result.isSafe, isFalse);
+      });
+
+      test(
+        'credentials (PUB_TOKEN) forbidden everywhere including '
+        'publish jobs',
+        () {
+          const content = '''
+env:
+  PUB_TOKEN: secret
+''';
+          final resultPatch = PublishSafety.assertSafeContent(
+            content,
+            workflow: 'publish.yaml',
+            job: 'publish_patch_minor',
+          );
+          expect(resultPatch.isSafe, isFalse);
+          expect(
+            resultPatch.violations.any(
+              (v) => v.rule == PublishSafety.noTokenEnvRule,
+            ),
+            isTrue,
+          );
+
+          final resultMajor = PublishSafety.assertSafeContent(
+            content,
+            workflow: 'publish.yaml',
+            job: 'publish_major',
+          );
+          expect(resultMajor.isSafe, isFalse);
+        },
+      );
+
+      test(
+        'credentials (PUB_CREDENTIALS) forbidden in publish jobs',
+        () {
+          const content = '''
+env:
+  PUB_CREDENTIALS: secret
+''';
+          final result = PublishSafety.assertSafeContent(
+            content,
+            workflow: 'publish.yaml',
+            job: 'publish_major',
+          );
+          expect(result.isSafe, isFalse);
+        },
+      );
+
+      test(
+        'dart pub publish --force still forbidden even in publish jobs',
+        () {
+          const content = '''
+run: dart pub publish --force
+''';
+          final result = PublishSafety.assertSafeContent(
+            content,
+            workflow: 'publish.yaml',
+            job: 'publish_patch_minor',
+          );
+          expect(result.isSafe, isFalse);
+          expect(
+            result.violations.any(
+              (v) => v.rule == PublishSafety.noForcePublishRule,
+            ),
+            isTrue,
+          );
+        },
+      );
+
+      // Regression: plain `dart pub publish` (no --force, no --dry-run)
+      // must be denied in non-approved workflows/jobs.
+      test(
+        'denies plain dart pub publish in non-approved job '
+        '(ci.yaml::quality_gate)',
+        () {
+          const content = '''
+      - name: Publish
+        run: dart pub publish
+''';
+          final result = PublishSafety.assertSafeContent(
+            content,
+            workflow: 'ci.yaml',
+            job: 'quality_gate',
+          );
+          expect(result.isSafe, isFalse);
+          expect(
+            result.violations.any(
+              (v) => v.rule == PublishSafety.noPlainPublishRule,
+            ),
+            isTrue,
+            reason: 'Plain dart pub publish must be denied in ci.yaml',
+          );
+        },
+      );
+
+      test(
+        'denies plain dart pub publish in release_version_pr.yaml',
+        () {
+          const content = '''
+      - name: Publish
+        run: dart pub publish
+''';
+          final result = PublishSafety.assertSafeContent(
+            content,
+            workflow: 'release_version_pr.yaml',
+            job: 'release_version_pr',
+          );
+          expect(result.isSafe, isFalse);
+          expect(
+            result.violations.any(
+              (v) => v.rule == PublishSafety.noPlainPublishRule,
+            ),
+            isTrue,
+          );
+        },
+      );
+
+      test(
+        'denies plain dart pub publish in publish.yaml::validate_release',
+        () {
+          const content = '''
+      - name: Publish
+        run: dart pub publish
+''';
+          final result = PublishSafety.assertSafeContent(
+            content,
+            workflow: 'publish.yaml',
+            job: 'validate_release',
+          );
+          expect(result.isSafe, isFalse);
+          expect(
+            result.violations.any(
+              (v) => v.rule == PublishSafety.noPlainPublishRule,
+            ),
+            isTrue,
+          );
+        },
+      );
+
+      test(
+        'denies plain dart pub publish with no workflow/job context',
+        () {
+          const content = '''
+run: dart pub publish
+''';
+          final result = PublishSafety.assertSafeContent(content);
+          expect(result.isSafe, isFalse);
+          expect(
+            result.violations.any(
+              (v) => v.rule == PublishSafety.noPlainPublishRule,
+            ),
+            isTrue,
+          );
+        },
+      );
+
+      test(
+        'denies plain dart pub publish in unknown workflow',
+        () {
+          const content = '''
+run: dart pub publish
+''';
+          final result = PublishSafety.assertSafeContent(
+            content,
+            workflow: 'custom_deploy.yaml',
+            job: 'deploy',
+          );
+          expect(result.isSafe, isFalse);
+          expect(
+            result.violations.any(
+              (v) => v.rule == PublishSafety.noPlainPublishRule,
+            ),
+            isTrue,
+          );
+        },
+      );
+
+      test(
+        'allows plain dart pub publish in publish.yaml::publish_patch_minor',
+        () {
+          const content = '''
+      - name: Publish package
+        run: dart pub publish
+''';
+          final result = PublishSafety.assertSafeContent(
+            content,
+            workflow: 'publish.yaml',
+            job: 'publish_patch_minor',
+          );
+          expect(
+            result.violations.where(
+              (v) => v.rule == PublishSafety.noPlainPublishRule,
+            ),
+            isEmpty,
+            reason: 'Approved publish job may use plain dart pub publish',
+          );
+        },
+      );
+
+      test(
+        'allows plain dart pub publish in publish.yaml::publish_major',
+        () {
+          const content = '''
+      - name: Publish package
+        run: dart pub publish
+''';
+          final result = PublishSafety.assertSafeContent(
+            content,
+            workflow: 'publish.yaml',
+            job: 'publish_major',
+          );
+          expect(
+            result.violations.where(
+              (v) => v.rule == PublishSafety.noPlainPublishRule,
+            ),
+            isEmpty,
+          );
+        },
+      );
+
+      test(
+        'dry-run publish not flagged by plain publish rule',
+        () {
+          const content = '''
+run: dart pub publish --dry-run
+''';
+          final result = PublishSafety.assertSafeContent(content);
+          expect(
+            result.violations.where(
+              (v) => v.rule == PublishSafety.noPlainPublishRule,
+            ),
+            isEmpty,
+            reason: 'Dry-run publish is safe and should not be flagged',
+          );
+        },
+      );
     });
 
     group('SafetyViolation', () {

@@ -1,14 +1,16 @@
-// Release changeset CLI: init, check, plan, version-pr.
+// Release changeset CLI: init, check, plan, version-pr, validate-release.
 //
 // Usage:
 //   dart run tool/release_changeset.dart init --package=<name> --bump=<level> --summary="<text>"
 //   dart run tool/release_changeset.dart check --changed-files=<files> [--base=<sha> --head=<sha>]
 //   dart run tool/release_changeset.dart plan --format=markdown|json
 //   dart run tool/release_changeset.dart version-pr
+//   dart run tool/release_changeset.dart validate-release --tag=<tag>
 //
 // This CLI is the release intent boundary. Candidates come ONLY from
 // changesets — validation expansion does not imply publication.
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'src/release_planner.dart';
@@ -33,6 +35,8 @@ Future<void> main(List<String> args) async {
       await _handlePlan(args.skip(1).toList());
     case 'version-pr':
       await _handleVersionPr(args.skip(1).toList());
+    case 'validate-release':
+      await _handleValidateRelease(args.skip(1).toList());
     default:
       stderr.writeln('Unknown subcommand: $subcommand');
       _printUsage();
@@ -52,7 +56,11 @@ void _printUsage() {
       '  check      Verify publishable changes have matching changesets',
     )
     ..writeln('  plan       Render the release plan from existing changesets')
-    ..writeln('  version-pr Apply version/changelog edits (slice two)')
+    ..writeln('  version-pr Apply version/changelog edits')
+    ..writeln(
+      '  validate-release Validate a release tag against '
+      'pubspec/changelog/provenance (slice three)',
+    )
     ..writeln()
     ..writeln('Options for init:')
     ..writeln('  --package=<name>     Package name (required)')
@@ -80,6 +88,12 @@ void _printUsage() {
       '  --changesets-dir=<path>  Changesets directory '
       '(default: .changesets)',
     )
+    ..writeln(
+      '  --workspace-root=<path>  Workspace root (default: current directory)',
+    )
+    ..writeln()
+    ..writeln('Options for validate-release:')
+    ..writeln('  --tag=<tag>              Release tag to validate (required)')
     ..writeln(
       '  --workspace-root=<path>  Workspace root (default: current directory)',
     );
@@ -267,8 +281,8 @@ Future<void> _handleVersionPr(List<String> args) async {
       ..writeln('No release candidates — no changesets found.')
       ..writeln()
       ..writeln(
-        'Publish handoff: no publish in slice one — '
-        'tag-triggered OIDC publishing is planned for slice two.',
+        'Publish handoff: tag-triggered OIDC publishing is available '
+        'via the publish workflow (publish.yaml).',
       );
     return;
   }
@@ -280,7 +294,11 @@ Future<void> _handleVersionPr(List<String> args) async {
     ..writeln('Candidates: ${plan.candidates.length}')
     ..writeln();
 
-  final edits = VersionEditor.applyVersionEdits(plan, workspaceRoot);
+  final edits = VersionEditor.applyVersionEdits(
+    plan,
+    workspaceRoot,
+    changesetsDir: changesetsDir,
+  );
 
   for (final edit in edits) {
     stdout.writeln('  ${edit.packageName}: ${edit.description}');
@@ -289,6 +307,119 @@ Future<void> _handleVersionPr(List<String> args) async {
   stdout
     ..writeln()
     ..writeln(plan.renderMarkdown());
+}
+
+Future<void> _handleValidateRelease(List<String> args) async {
+  final tag = _extractArg(args, 'tag');
+  final workspaceRoot = _extractArg(args, 'workspace-root').isEmpty
+      ? Directory.current.path
+      : _extractArg(args, 'workspace-root');
+  final changesetsDir = _extractArg(args, 'changesets-dir').isEmpty
+      ? _defaultChangesetsDir
+      : _extractArg(args, 'changesets-dir');
+
+  if (tag.isEmpty) {
+    stderr.writeln('ERROR: --tag is required for validate-release.');
+    _printUsage();
+    exit(64);
+  }
+
+  // Parse the tag to determine the package name.
+  final TagInfo tagInfo;
+  try {
+    tagInfo = TagParser.parse(tag);
+  } on FormatException catch (e) {
+    stderr.writeln('ERROR: ${e.message}');
+    stdout.writeln(
+      '{"isValid": false, "errors": ["${e.message}"], '
+      '"package": "", "version": "", "isMajor": false}',
+    );
+    exit(1);
+  }
+
+  // Read pubspec content.
+  final pubspecPath =
+      '$workspaceRoot/packages/${tagInfo.packageName}/pubspec.yaml';
+  final pubspecFile = File(pubspecPath);
+  if (!pubspecFile.existsSync()) {
+    stderr.writeln(
+      'ERROR: pubspec not found at $pubspecPath.',
+    );
+    stdout.writeln(
+      '{"isValid": false, '
+      '"errors": ["pubspec not found for ${tagInfo.packageName}"], '
+      '"package": "${tagInfo.packageName}", '
+      '"version": "${tagInfo.version}", "isMajor": false}',
+    );
+    exit(1);
+  }
+  final pubspecContent = pubspecFile.readAsStringSync();
+
+  // Read changelog content.
+  final changelogPath =
+      '$workspaceRoot/packages/${tagInfo.packageName}/CHANGELOG.md';
+  final changelogFile = File(changelogPath);
+  if (!changelogFile.existsSync()) {
+    stderr.writeln(
+      'ERROR: CHANGELOG.md not found at $changelogPath.',
+    );
+    stdout.writeln(
+      '{"isValid": false, '
+      '"errors": ["CHANGELOG.md not found for ${tagInfo.packageName}"], '
+      '"package": "${tagInfo.packageName}", '
+      '"version": "${tagInfo.version}", "isMajor": false}',
+    );
+    exit(1);
+  }
+  final changelogContent = changelogFile.readAsStringSync();
+
+  // Read provenance manifest (may be absent — fails closed).
+  final provenancePath =
+      '$changesetsDir/releases/${tagInfo.packageName}-${tagInfo.version}.json';
+  final provenanceFile = File(provenancePath);
+  final String? provenanceJson;
+  if (provenanceFile.existsSync()) {
+    provenanceJson = provenanceFile.readAsStringSync();
+  } else {
+    provenanceJson = null;
+  }
+
+  // Run validation with dependency preflight for explicit package.
+  final result = ReleaseValidator.validateRelease(
+    tag: tag,
+    pubspecContent: pubspecContent,
+    changelogContent: changelogContent,
+    provenanceJson: provenanceJson,
+    metadataFetcher: _fetchPubDevMetadata,
+  );
+
+  // Output JSON result to stdout (JSON-only for workflow consumption).
+  final output = {
+    'isValid': result.isValid,
+    'errors': result.errors,
+    'package': result.packageName,
+    'version': result.version,
+    'isMajor': result.isMajor,
+  };
+  stdout.writeln(const JsonEncoder.withIndent('  ').convert(output));
+
+  if (!result.isValid) {
+    stderr
+      ..writeln()
+      ..writeln('=== Release Validation FAILED ===')
+      ..writeln();
+    for (final error in result.errors) {
+      stderr.writeln('  - $error');
+    }
+    exit(1);
+  } else {
+    stderr
+      ..writeln()
+      ..writeln('=== Release Validation PASSED ===')
+      ..writeln('  Package: ${result.packageName}')
+      ..writeln('  Version: ${result.version}')
+      ..writeln('  Major:   ${result.isMajor}');
+  }
 }
 
 List<Changeset> _loadChangesets(String dir) {
@@ -359,4 +490,37 @@ Future<List<String>> _getGitDiffFiles(String base, String head) async {
   final output = (result.stdout as String).trim();
   if (output.isEmpty) return [];
   return output.split('\n');
+}
+
+/// Fetches pub.dev package metadata via the pub.dev API.
+///
+/// Uses `curl` for synchronous HTTP in the CLI context.
+/// Returns a [PubDevMetadata] with all published versions.
+/// Throws on network or parse errors (fail-closed).
+PubDevMetadata _fetchPubDevMetadata(String packageName) {
+  final url = 'https://pub.dev/api/packages/$packageName';
+  final result = Process.runSync(
+    'curl',
+    ['--silent', '--fail', '--max-time', '10', url],
+  );
+
+  if (result.exitCode != 0) {
+    throw Exception(
+      'pub.dev API request failed for $packageName '
+      '(curl exit code ${result.exitCode})',
+    );
+  }
+
+  final body = (result.stdout as String).trim();
+  if (body.isEmpty) {
+    throw Exception('pub.dev API returned empty response for $packageName');
+  }
+
+  final decoded = jsonDecode(body) as Map<String, dynamic>;
+  final versionsList = decoded['versions'] as List<dynamic>? ?? [];
+  final versions = versionsList
+      .map((v) => (v as Map<String, dynamic>)['version'] as String)
+      .toList();
+
+  return PubDevMetadata(packageName: packageName, versions: versions);
 }

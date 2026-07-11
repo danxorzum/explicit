@@ -4,7 +4,7 @@ name: Release Version PR
 # and changelogs based on merged changesets.
 #
 # This workflow does NOT create tags or publish to pub.dev.
-# Tag-triggered OIDC publishing is planned for a future slice.
+# Tag-triggered OIDC publishing is handled by publish.yaml.
 
 concurrency:
   group: release-version-pr
@@ -76,9 +76,9 @@ jobs:
             echo ""
             echo "---"
             echo ""
-            echo "**No publish in slice one** — this workflow only updates"
+            echo "**No publish in this workflow** — this workflow only updates"
             echo "versions and changelogs. Tag-triggered OIDC publishing is"
-            echo "planned for a future slice."
+            echo "handled by publish.yaml."
             echo ""
             echo "After merging this PR, tags will be created manually or"
             echo "by a future automation to trigger publishing."
@@ -118,7 +118,7 @@ jobs:
       - name: Log handoff state
         run: |
           echo "=== Publish Handoff ==="
-          echo "Slice one: no publish — tag-triggered OIDC publishing"
-          echo "is planned for a future slice."
+          echo "This workflow does not publish — tag-triggered OIDC"
+          echo "publishing is handled by publish.yaml."
           echo ""
           echo "No tags created. No pub.dev upload performed."

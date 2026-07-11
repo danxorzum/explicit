@@ -1,7 +1,7 @@
 /// Version editor: applies line-based version and changelog edits
 /// to package pubspec.yaml and CHANGELOG.md files.
 ///
-/// This module implements the version-pr boundary for slice two.
+/// This module implements the version-pr boundary.
 /// It updates versions, changelogs, and dependency caret ranges
 /// based on a computed release plan.
 library;
@@ -149,11 +149,14 @@ class VersionEditor {
   /// at [workspaceRoot].
   ///
   /// Edits are applied in publish order (explicit_outcome first).
+  /// When [changesetsDir] is provided, emits release provenance
+  /// manifests to `<changesetsDir>/releases/<package>-<version>.json`.
   /// Returns a list of [VersionEdit] describing every change made.
   static List<VersionEdit> applyVersionEdits(
     ReleasePlan plan,
-    String workspaceRoot,
-  ) {
+    String workspaceRoot, {
+    String? changesetsDir,
+  }) {
     if (plan.candidates.isEmpty) return [];
 
     final edits = <VersionEdit>[];
@@ -250,7 +253,85 @@ class VersionEditor {
       );
     }
 
+    // Emit release provenance manifests.
+    if (changesetsDir != null) {
+      _emitProvenance(plan, newVersions, changesetsDir);
+    }
+
     return edits;
+  }
+
+  /// Emits release provenance manifests for each candidate.
+  ///
+  /// Writes one JSON file per candidate to
+  /// `<changesetsDir>/releases/<package>-<version>.json`.
+  /// Hashes are deterministic and idempotent.
+  static void _emitProvenance(
+    ReleasePlan plan,
+    Map<String, String> newVersions,
+    String changesetsDir,
+  ) {
+    final releasesDir = Directory('$changesetsDir/releases');
+    if (!releasesDir.existsSync()) {
+      releasesDir.createSync(recursive: true);
+    }
+
+    // Load changeset files to compute content hashes.
+    final changesetFiles = _loadChangesetFiles(changesetsDir);
+
+    for (final candidate in plan.candidates) {
+      final version = newVersions[candidate.packageName];
+      if (version == null) continue;
+
+      // Compute changeset hashes for this candidate's package.
+      final changesetHashes = <String>[];
+      for (final csFile in changesetFiles) {
+        if (csFile.content.contains('${candidate.packageName}:')) {
+          changesetHashes.add(
+            ReleaseProvenance.computeContentHash(csFile.content),
+          );
+        }
+      }
+
+      // Compute changelog notes hash.
+      final notesHash = ReleaseProvenance.computeContentHash(candidate.notes);
+
+      final provenance = ReleaseProvenance(
+        packageName: candidate.packageName,
+        version: version,
+        bump: candidate.bump.name,
+        changesetHashes: changesetHashes,
+        changelogNotesHash: notesHash,
+      );
+
+      final filename =
+          '${candidate.packageName}-$version.json';
+      File('${releasesDir.path}/$filename')
+          .writeAsStringSync(provenance.toJson());
+    }
+  }
+
+  /// Loads changeset markdown files from the changesets directory.
+  static List<_ChangesetFile> _loadChangesetFiles(String changesetsDir) {
+    final dir = Directory(changesetsDir);
+    if (!dir.existsSync()) return [];
+
+    return dir
+        .listSync()
+        .whereType<File>()
+        .where((f) => f.path.endsWith('.md'))
+        .where(
+          (f) =>
+              f.path.split(RegExp(r'[/\\]')).last.toLowerCase() !=
+              'readme.md',
+        )
+        .map(
+          (f) => _ChangesetFile(
+            path: f.path,
+            content: f.readAsStringSync(),
+          ),
+        )
+        .toList();
   }
 
   /// Returns true if the line is a top-level `version:` field.
@@ -281,4 +362,12 @@ class VersionEditor {
     return trimmed.startsWith('$dependencyName:') ||
         trimmed.startsWith('$dependencyName :');
   }
+}
+
+/// Internal helper: a changeset file path and its content.
+class _ChangesetFile {
+  const _ChangesetFile({required this.path, required this.content});
+
+  final String path;
+  final String content;
 }

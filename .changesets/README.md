@@ -72,4 +72,4 @@ This creates a boilerplate file in `.changesets/`.
 2. CI verifies publishable changes have matching changesets.
 3. After merge, the release workflow converts changesets into a version PR.
 4. Version PR updates `pubspec.yaml` versions and `CHANGELOG.md` entries.
-5. Merging the version PR prepares for tag-triggered publishing (slice two).
+5. Merging the version PR prepares for intentional tag-triggered publishing.
