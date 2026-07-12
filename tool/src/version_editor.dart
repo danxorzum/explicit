@@ -163,7 +163,9 @@ class VersionEditor {
     final now = DateTime.now();
 
     // Build a map of package → new version for dependency propagation.
+    // Also capture previous versions for provenance.
     final newVersions = <String, String>{};
+    final previousVersions = <String, String>{};
     for (final candidate in plan.candidates) {
       final pubspecPath =
           '$workspaceRoot/packages/${candidate.packageName}/pubspec.yaml';
@@ -175,6 +177,7 @@ class VersionEditor {
       );
       if (currentVersion == null) continue;
 
+      previousVersions[candidate.packageName] = currentVersion;
       newVersions[candidate.packageName] = computeNextVersion(
         currentVersion,
         candidate.bump,
@@ -247,7 +250,8 @@ class VersionEditor {
         VersionEdit(
           packageName: depUpdate.packageName,
           filePath: 'packages/${depUpdate.packageName}/pubspec.yaml',
-          description: 'Updated ${depUpdate.dependencyName} '
+          description:
+              'Updated ${depUpdate.dependencyName} '
               'dependency to ^$depNewVersion',
         ),
       );
@@ -255,7 +259,8 @@ class VersionEditor {
 
     // Emit release provenance manifests.
     if (changesetsDir != null) {
-      _emitProvenance(plan, newVersions, changesetsDir);
+      _emitProvenance(plan, newVersions, previousVersions, changesetsDir);
+      _removeConsumedChangesets(changesetsDir);
     }
 
     return edits;
@@ -269,10 +274,17 @@ class VersionEditor {
   static void _emitProvenance(
     ReleasePlan plan,
     Map<String, String> newVersions,
+    Map<String, String> previousVersions,
     String changesetsDir,
   ) {
     final releasesDir = Directory('$changesetsDir/releases');
-    if (!releasesDir.existsSync()) {
+    if (releasesDir.existsSync()) {
+      for (final file in releasesDir.listSync().whereType<File>()) {
+        if (file.path.endsWith('.json')) {
+          file.deleteSync();
+        }
+      }
+    } else {
       releasesDir.createSync(recursive: true);
     }
 
@@ -281,12 +293,15 @@ class VersionEditor {
 
     for (final candidate in plan.candidates) {
       final version = newVersions[candidate.packageName];
-      if (version == null) continue;
+      final previousVersion = previousVersions[candidate.packageName];
+      if (version == null || previousVersion == null) continue;
 
       // Compute changeset hashes for this candidate's package.
       final changesetHashes = <String>[];
+      final changesetContents = <String>[];
       for (final csFile in changesetFiles) {
         if (csFile.content.contains('${candidate.packageName}:')) {
+          changesetContents.add(csFile.content);
           changesetHashes.add(
             ReleaseProvenance.computeContentHash(csFile.content),
           );
@@ -296,18 +311,36 @@ class VersionEditor {
       // Compute changelog notes hash.
       final notesHash = ReleaseProvenance.computeContentHash(candidate.notes);
 
+      // Compute intended tag.
+      final tag = '${candidate.packageName}/v$version';
+
       final provenance = ReleaseProvenance(
         packageName: candidate.packageName,
         version: version,
+        previousVersion: previousVersion,
+        nextVersion: version,
         bump: candidate.bump.name,
         changesetHashes: changesetHashes,
+        changesetContents: changesetContents,
+        impactProof: candidate.impactProof,
         changelogNotesHash: notesHash,
+        tag: tag,
       );
 
-      final filename =
-          '${candidate.packageName}-$version.json';
-      File('${releasesDir.path}/$filename')
-          .writeAsStringSync(provenance.toJson());
+      final filename = '${candidate.packageName}-$version.json';
+      File(
+        '${releasesDir.path}/$filename',
+      ).writeAsStringSync(provenance.toJson());
+    }
+  }
+
+  /// Removes active changeset markdown after immutable provenance is written.
+  static void _removeConsumedChangesets(String changesetsDir) {
+    for (final changeset in _loadChangesetFiles(changesetsDir)) {
+      final file = File(changeset.path);
+      if (file.existsSync()) {
+        file.deleteSync();
+      }
     }
   }
 
@@ -316,22 +349,25 @@ class VersionEditor {
     final dir = Directory(changesetsDir);
     if (!dir.existsSync()) return [];
 
-    return dir
-        .listSync()
-        .whereType<File>()
-        .where((f) => f.path.endsWith('.md'))
-        .where(
-          (f) =>
-              f.path.split(RegExp(r'[/\\]')).last.toLowerCase() !=
-              'readme.md',
-        )
-        .map(
-          (f) => _ChangesetFile(
-            path: f.path,
-            content: f.readAsStringSync(),
-          ),
-        )
-        .toList();
+    final files =
+        dir
+            .listSync()
+            .whereType<File>()
+            .where((f) => f.path.endsWith('.md'))
+            .where(
+              (f) =>
+                  f.path.split(RegExp(r'[/\\]')).last.toLowerCase() !=
+                  'readme.md',
+            )
+            .map(
+              (f) => _ChangesetFile(
+                path: f.path,
+                content: f.readAsStringSync(),
+              ),
+            )
+            .toList()
+          ..sort((a, b) => a.path.compareTo(b.path));
+    return files;
   }
 
   /// Returns true if the line is a top-level `version:` field.

@@ -271,10 +271,12 @@ dev_dependencies:
       setUp(() {
         tempDir = Directory.systemTemp.createTempSync('version_editor_test_');
         // Create workspace structure.
-        Directory('${tempDir.path}/packages/explicit_outcome')
-            .createSync(recursive: true);
-        Directory('${tempDir.path}/packages/explicit')
-            .createSync(recursive: true);
+        Directory(
+          '${tempDir.path}/packages/explicit_outcome',
+        ).createSync(recursive: true);
+        Directory(
+          '${tempDir.path}/packages/explicit',
+        ).createSync(recursive: true);
 
         File(
           '${tempDir.path}/packages/explicit_outcome/pubspec.yaml',
@@ -463,7 +465,8 @@ explicit: patch
         expect(
           outcomeProvenance.existsSync(),
           isTrue,
-          reason: 'Provenance manifest should be emitted for '
+          reason:
+              'Provenance manifest should be emitted for '
               'explicit_outcome',
         );
 
@@ -508,15 +511,22 @@ explicit: patch
 
         final changesetsDir = Directory('${tempDir.path}/.changesets')
           ..createSync();
-        File('${changesetsDir.path}/fix.md').writeAsStringSync('''
+        const changesetContent = '''
 ---
 explicit_outcome: patch
 ---
 
 - Fix edge case.
-''');
+''';
+        File('${changesetsDir.path}/fix.md').writeAsStringSync(
+          changesetContent,
+        );
 
         // Run twice — should produce identical provenance.
+        File('${changesetsDir.path}/fix.md').writeAsStringSync(
+          changesetContent,
+        );
+
         VersionEditor.applyVersionEdits(
           plan,
           tempDir.path,
@@ -526,6 +536,17 @@ explicit_outcome: patch
           '${changesetsDir.path}/releases/'
           'explicit_outcome-0.0.2.json',
         ).readAsStringSync();
+
+        File(
+          '${tempDir.path}/packages/explicit_outcome/pubspec.yaml',
+        ).writeAsStringSync('''
+name: explicit_outcome
+version: 0.0.1
+description: Dart typed outcomes.
+''');
+        File('${changesetsDir.path}/fix.md').writeAsStringSync(
+          changesetContent,
+        );
 
         VersionEditor.applyVersionEdits(
           plan,
@@ -539,6 +560,169 @@ explicit_outcome: patch
 
         expect(firstContent, secondContent);
       });
+
+      test(
+        'provenance captures changesets in deterministic filename order',
+        () {
+          const plan = ReleasePlan(
+            candidates: [
+              ReleaseCandidate(
+                packageName: 'explicit_outcome',
+                bump: BumpLevel.minor,
+                notes: '- First.\n- Second.',
+              ),
+            ],
+            dependencyUpdates: [],
+          );
+
+          final changesetsDir = Directory('${tempDir.path}/.changesets')
+            ..createSync();
+          File('${changesetsDir.path}/b-second.md').writeAsStringSync('''
+---
+explicit_outcome: patch
+---
+
+- Second.
+''');
+          File('${changesetsDir.path}/a-first.md').writeAsStringSync('''
+---
+explicit_outcome: minor
+---
+
+- First.
+''');
+
+          VersionEditor.applyVersionEdits(
+            plan,
+            tempDir.path,
+            changesetsDir: changesetsDir.path,
+          );
+
+          final provenance = ReleaseProvenance.fromJson(
+            File(
+              '${changesetsDir.path}/releases/explicit_outcome-0.1.0.json',
+            ).readAsStringSync(),
+          );
+
+          expect(provenance.changesetContents, [
+            '''
+---
+explicit_outcome: minor
+---
+
+- First.
+''',
+            '''
+---
+explicit_outcome: patch
+---
+
+- Second.
+''',
+          ]);
+          expect(provenance.changesetHashes, [
+            ReleaseProvenance.computeContentHash(
+              provenance.changesetContents[0],
+            ),
+            ReleaseProvenance.computeContentHash(
+              provenance.changesetContents[1],
+            ),
+          ]);
+        },
+      );
+
+      test(
+        'removes consumed changeset markdown after provenance is emitted',
+        () {
+          const plan = ReleasePlan(
+            candidates: [
+              ReleaseCandidate(
+                packageName: 'explicit_outcome',
+                bump: BumpLevel.patch,
+                notes: '- Fix.',
+              ),
+            ],
+            dependencyUpdates: [],
+          );
+
+          final changesetsDir = Directory('${tempDir.path}/.changesets')
+            ..createSync();
+          final consumed = File('${changesetsDir.path}/fix.md')
+            ..writeAsStringSync('''
+---
+explicit_outcome: patch
+---
+
+- Fix.
+''');
+          final readme = File('${changesetsDir.path}/README.md')
+            ..writeAsStringSync('# Changesets\n');
+
+          VersionEditor.applyVersionEdits(
+            plan,
+            tempDir.path,
+            changesetsDir: changesetsDir.path,
+          );
+
+          expect(consumed.existsSync(), isFalse);
+          expect(readme.existsSync(), isTrue);
+          expect(
+            File(
+              '${changesetsDir.path}/releases/explicit_outcome-0.0.2.json',
+            ).existsSync(),
+            isTrue,
+          );
+        },
+      );
+
+      test(
+        'removes stale release provenance before writing current output',
+        () {
+          const plan = ReleasePlan(
+            candidates: [
+              ReleaseCandidate(
+                packageName: 'explicit_outcome',
+                bump: BumpLevel.patch,
+                notes: '- Fix.',
+              ),
+            ],
+            dependencyUpdates: [],
+          );
+
+          final changesetsDir = Directory('${tempDir.path}/.changesets')
+            ..createSync();
+          final releasesDir = Directory('${changesetsDir.path}/releases')
+            ..createSync();
+          File(
+            '${releasesDir.path}/explicit_outcome-0.0.1.json',
+          ).writeAsStringSync('{"stale": true}');
+          const changesetContent = '''
+---
+explicit_outcome: patch
+---
+
+- Fix.
+''';
+          File('${changesetsDir.path}/fix.md').writeAsStringSync(
+            changesetContent,
+          );
+
+          VersionEditor.applyVersionEdits(
+            plan,
+            tempDir.path,
+            changesetsDir: changesetsDir.path,
+          );
+
+          final releaseFiles =
+              releasesDir
+                  .listSync()
+                  .whereType<File>()
+                  .map((file) => file.path.split(Platform.pathSeparator).last)
+                  .toList()
+                ..sort();
+          expect(releaseFiles, ['explicit_outcome-0.0.2.json']);
+        },
+      );
 
       test('maintains publish order: explicit_outcome edited first', () {
         const plan = ReleasePlan(
@@ -578,6 +762,171 @@ explicit_outcome: patch
           edits.indexOf(outcomeEdits.first),
           lessThan(edits.indexOf(explicitEdits.first)),
         );
+      });
+
+      // Corrective Slice 2: provenance includes previousVersion and tag.
+      test('provenance includes previousVersion and intended tag', () {
+        const plan = ReleasePlan(
+          candidates: [
+            ReleaseCandidate(
+              packageName: 'explicit_outcome',
+              bump: BumpLevel.minor,
+              notes: '- Add feature.',
+            ),
+          ],
+          dependencyUpdates: [],
+        );
+
+        final changesetsDir = Directory('${tempDir.path}/.changesets')
+          ..createSync();
+        File('${changesetsDir.path}/feature.md').writeAsStringSync('''
+---
+explicit_outcome: minor
+---
+
+- Add feature.
+''');
+
+        VersionEditor.applyVersionEdits(
+          plan,
+          tempDir.path,
+          changesetsDir: changesetsDir.path,
+        );
+
+        final provenanceFile = File(
+          '${changesetsDir.path}/releases/'
+          'explicit_outcome-0.1.0.json',
+        );
+        expect(provenanceFile.existsSync(), isTrue);
+
+        final provenance = ReleaseProvenance.fromJson(
+          provenanceFile.readAsStringSync(),
+        );
+        expect(provenance.previousVersion, '0.0.1');
+        expect(provenance.version, '0.1.0');
+        expect(provenance.tag, 'explicit_outcome/v0.1.0');
+        expect(provenance.bump, 'minor');
+      });
+
+      test(
+        'provenance emitted only for plan candidates (not all changesets)',
+        () {
+          // Plan has only explicit_outcome as candidate.
+          // Changeset declares intent for both packages, but only
+          // explicit_outcome is a reconciled candidate.
+          const plan = ReleasePlan(
+            candidates: [
+              ReleaseCandidate(
+                packageName: 'explicit_outcome',
+                bump: BumpLevel.patch,
+                notes: '- Fix.',
+              ),
+            ],
+            dependencyUpdates: [],
+          );
+
+          final changesetsDir = Directory('${tempDir.path}/.changesets')
+            ..createSync();
+          // Changeset declares intent for both packages.
+          File('${changesetsDir.path}/mixed.md').writeAsStringSync('''
+---
+explicit_outcome: patch
+explicit: patch
+---
+
+- Fix.
+''');
+
+          VersionEditor.applyVersionEdits(
+            plan,
+            tempDir.path,
+            changesetsDir: changesetsDir.path,
+          );
+
+          // Provenance should exist only for explicit_outcome (candidate).
+          final outcomeProvenance = File(
+            '${changesetsDir.path}/releases/'
+            'explicit_outcome-0.0.2.json',
+          );
+          expect(
+            outcomeProvenance.existsSync(),
+            isTrue,
+            reason: 'Provenance should be emitted for reconciled candidate',
+          );
+
+          // Provenance should NOT exist for explicit (not a candidate).
+          final explicitProvenance = File(
+            '${changesetsDir.path}/releases/explicit-0.0.2.json',
+          );
+          expect(
+            explicitProvenance.existsSync(),
+            isFalse,
+            reason:
+                'Provenance should NOT be emitted for non-candidate '
+                'packages (changeset intent without real impact)',
+          );
+        },
+      );
+
+      test('provenance previousVersion is deterministic across runs', () {
+        const plan = ReleasePlan(
+          candidates: [
+            ReleaseCandidate(
+              packageName: 'explicit_outcome',
+              bump: BumpLevel.patch,
+              notes: '- Fix.',
+            ),
+          ],
+          dependencyUpdates: [],
+        );
+
+        final changesetsDir = Directory('${tempDir.path}/.changesets')
+          ..createSync();
+        const changesetContent = '''
+---
+explicit_outcome: patch
+---
+
+- Fix.
+''';
+        File('${changesetsDir.path}/fix.md').writeAsStringSync(
+          changesetContent,
+        );
+
+        // Run twice — provenance should be identical.
+        VersionEditor.applyVersionEdits(
+          plan,
+          tempDir.path,
+          changesetsDir: changesetsDir.path,
+        );
+        final first = File(
+          '${changesetsDir.path}/releases/'
+          'explicit_outcome-0.0.2.json',
+        ).readAsStringSync();
+
+        // Reset pubspec to original version for second run.
+        File(
+          '${tempDir.path}/packages/explicit_outcome/pubspec.yaml',
+        ).writeAsStringSync('''
+name: explicit_outcome
+version: 0.0.1
+description: Dart typed outcomes.
+''');
+        File('${changesetsDir.path}/fix.md').writeAsStringSync(
+          changesetContent,
+        );
+
+        VersionEditor.applyVersionEdits(
+          plan,
+          tempDir.path,
+          changesetsDir: changesetsDir.path,
+        );
+        final second = File(
+          '${changesetsDir.path}/releases/'
+          'explicit_outcome-0.0.2.json',
+        ).readAsStringSync();
+
+        expect(first, second);
       });
     });
   });

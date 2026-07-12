@@ -1,10 +1,19 @@
 name: Release Version PR
 
-# Opens or updates a release version PR that bumps package versions
-# and changelogs based on merged changesets.
+# Opens or updates a release version PR that bumps package versions,
+# changelogs, and release provenance based on reconciled changeset intent AND
+# real package impact.
 #
-# This workflow does NOT create tags or publish to pub.dev.
-# Tag-triggered OIDC publishing is handled by publish.yaml.
+# DIFF CONTEXT: Every plan and version-pr invocation receives --base/--head.
+# The base is the last release version PR merge commit, falling back to the root
+# commit before the first release version PR exists. It intentionally does not
+# use package release tags because a latest global tag can hide unreleased
+# changesets for another package.
+#
+# This workflow does NOT publish and never creates release tags. After this PR
+# is merged and CI is green, the maintainer manually creates and pushes the
+# validated release tags. Tag-triggered OIDC publishing is handled by
+# publish.yaml.
 
 concurrency:
   group: release-version-pr
@@ -36,18 +45,61 @@ jobs:
       - name: Install workspace dependencies
         run: dart pub get
 
+      - name: Compute diff context
+        id: diff_context
+        run: |
+          HEAD_SHA="${{ github.event.after }}"
+          BASE_SHA=""
+
+          LAST_RELEASE_COMMIT=$(git log --oneline --grep="chore(release): prepare package versions" -1 --format="%H" main 2>/dev/null || echo "")
+          if [ -n "$LAST_RELEASE_COMMIT" ]; then
+            BASE_SHA="$LAST_RELEASE_COMMIT"
+            echo "Diff context: using last version PR merge '$LAST_RELEASE_COMMIT' as base."
+          fi
+
+          if [ -z "$BASE_SHA" ]; then
+            ROOT_COMMIT=$(git rev-list --max-parents=0 HEAD 2>/dev/null | tail -1 || echo "")
+            if [ -n "$ROOT_COMMIT" ]; then
+              BASE_SHA="$ROOT_COMMIT"
+              echo "Diff context: using repository root '$ROOT_COMMIT' as conservative base."
+            fi
+          fi
+
+          if [ -z "$BASE_SHA" ]; then
+            echo "Diff context: FAIL CLOSED — no safe base SHA found."
+            echo "Release planning requires a reliable comparison range."
+          fi
+
+          echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
+          echo "head_sha=${HEAD_SHA:-HEAD}" >> "$GITHUB_OUTPUT"
+
       - name: Render release plan
+        if: steps.diff_context.outputs.base_sha != ''
         run: |
           echo "=== Release Plan ==="
-          dart run tool/release_changeset.dart plan --format=markdown
+          dart run tool/release_changeset.dart plan --format=markdown \
+            --base=${{ steps.diff_context.outputs.base_sha }} \
+            --head=${{ steps.diff_context.outputs.head_sha }}
           echo ""
           echo "=== JSON Plan (for PR body) ==="
-          dart run tool/release_changeset.dart plan --format=json
+          dart run tool/release_changeset.dart plan --format=json \
+            --base=${{ steps.diff_context.outputs.base_sha }} \
+            --head=${{ steps.diff_context.outputs.head_sha }}
+
+      - name: Skip release plan (no diff context)
+        if: steps.diff_context.outputs.base_sha == ''
+        run: |
+          echo "=== Release Plan SKIPPED ==="
+          echo "No safe diff context available — release planning skipped."
+          echo "This is fail-closed behavior: without a reliable base/head range, the reconciler cannot prove real package impact."
 
       - name: Check for release candidates
         id: check_candidates
+        if: steps.diff_context.outputs.base_sha != ''
         run: |
-          PLAN_JSON=$(dart run tool/release_changeset.dart plan --format=json)
+          PLAN_JSON=$(dart run tool/release_changeset.dart plan --format=json \
+            --base=${{ steps.diff_context.outputs.base_sha }} \
+            --head=${{ steps.diff_context.outputs.head_sha }})
           CANDIDATE_COUNT=$(echo "$PLAN_JSON" | python3 -c "import sys, json; print(len(json.load(sys.stdin)['candidates']))")
           echo "candidate_count=$CANDIDATE_COUNT" >> "$GITHUB_OUTPUT"
           if [ "$CANDIDATE_COUNT" -eq 0 ]; then
@@ -57,40 +109,46 @@ jobs:
           fi
 
       - name: Apply version edits
-        if: steps.check_candidates.outputs.candidate_count != '0'
+        if: >-
+          steps.diff_context.outputs.base_sha != '' &&
+          fromJSON(steps.check_candidates.outputs.candidate_count) > 0
         run: |
           echo "=== Applying Version Edits ==="
-          dart run tool/release_changeset.dart version-pr
+          dart run tool/release_changeset.dart version-pr \
+            --base=${{ steps.diff_context.outputs.base_sha }} \
+            --head=${{ steps.diff_context.outputs.head_sha }}
           echo ""
           echo "=== Version edits applied ==="
           git diff --stat
 
       - name: Generate PR body
-        if: steps.check_candidates.outputs.candidate_count != '0'
+        if: >-
+          steps.diff_context.outputs.base_sha != '' &&
+          fromJSON(steps.check_candidates.outputs.candidate_count) > 0
         id: pr_body
         run: |
-          PLAN_MD=$(dart run tool/release_changeset.dart plan --format=markdown)
+          PR_BODY_FILE="$RUNNER_TEMP/release-version-pr-body.md"
+          PLAN_MD=$(dart run tool/release_changeset.dart plan --format=markdown \
+            --base=${{ steps.diff_context.outputs.base_sha }} \
+            --head=${{ steps.diff_context.outputs.head_sha }})
           {
-            echo "body<<EOF"
-            echo "$PLAN_MD"
-            echo ""
-            echo "---"
-            echo ""
-            echo "**No publish in this workflow** — this workflow only updates"
-            echo "versions and changelogs. Tag-triggered OIDC publishing is"
-            echo "handled by publish.yaml."
-            echo ""
-            echo "After merging this PR, tags will be created manually or"
-            echo "by a future automation to trigger publishing."
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+            printf '%s\n' "$PLAN_MD"
+            printf '\n---\n\n'
+            printf '%s\n' "**No publish or tags in this workflow** — this workflow only updates versions, changelogs, and release provenance."
+            printf '%s\n' "After this PR is merged and CI is green, the maintainer manually creates and pushes the validated release tags."
+            printf '%s\n' "Those tags trigger OIDC publishing through publish.yaml."
+          } > "$PR_BODY_FILE"
 
       - name: Create or update release version PR
-        if: steps.check_candidates.outputs.candidate_count != '0'
+        if: >-
+          steps.diff_context.outputs.base_sha != '' &&
+          fromJSON(steps.check_candidates.outputs.candidate_count) > 0
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           BRANCH="automation/release-version"
+          PR_BODY_FILE="$RUNNER_TEMP/release-version-pr-body.md"
+          test -s "$PR_BODY_FILE"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -B "$BRANCH"
@@ -98,27 +156,25 @@ jobs:
           git commit -m "chore(release): prepare package versions"
           git push --force origin "$BRANCH"
 
-          # Check if PR already exists.
           EXISTING_PR=$(gh pr list --head "$BRANCH" --base main --json number --jq '.[0].number // empty')
 
           if [ -n "$EXISTING_PR" ]; then
             echo "Updating existing PR #$EXISTING_PR"
             gh pr edit "$EXISTING_PR" \
               --title "chore(release): prepare package versions" \
-              --body "${{ steps.pr_body.outputs.body }}"
+              --body-file "$PR_BODY_FILE"
           else
             echo "Creating new release version PR"
             gh pr create \
               --title "chore(release): prepare package versions" \
-              --body "${{ steps.pr_body.outputs.body }}" \
+              --body-file "$PR_BODY_FILE" \
               --base main \
               --head "$BRANCH"
           fi
 
-      - name: Log handoff state
+      - name: Log release automation state
         run: |
-          echo "=== Publish Handoff ==="
-          echo "This workflow does not publish — tag-triggered OIDC"
-          echo "publishing is handled by publish.yaml."
-          echo ""
-          echo "No tags created. No pub.dev upload performed."
+          echo "=== Release Automation State ==="
+          echo "This workflow does not publish and creates no release tags."
+          echo "After the release/version PR merges and CI is green, the maintainer manually creates and pushes validated release tags."
+          echo "Those tags trigger OIDC publishing through publish.yaml."

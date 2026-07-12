@@ -36,3 +36,4 @@ Closes #
 - [ ] 📝 Documentation
 - [ ] 🗑️ Chore
 - [ ] 🧪 Test
+- [ ] 🎓 Example

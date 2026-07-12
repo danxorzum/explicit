@@ -4,8 +4,7 @@
 /// This module is the boundary for release intent. Candidates come ONLY
 /// from changesets — validation expansion does not imply publication.
 ///
-/// Slice 3 adds: release provenance, tag parsing/validation,
-/// dependency preflight, and major release detection.
+/// Adds release provenance, tag parsing/validation, and dependency preflight.
 library;
 
 import 'dart:convert';
@@ -175,6 +174,7 @@ class ReleaseCandidate {
     required this.packageName,
     required this.bump,
     required this.notes,
+    this.impactProof = const [],
   });
 
   /// Package name.
@@ -185,6 +185,9 @@ class ReleaseCandidate {
 
   /// Collected changelog notes from all changesets.
   final String notes;
+
+  /// Files that proved real package impact during reconciliation.
+  final List<String> impactProof;
 }
 
 /// A dependency update: when a package's dependency on another released
@@ -238,8 +241,7 @@ class ReleasePlan {
     if (candidates.isEmpty) {
       return '## Release Plan\n\n'
           'No release candidates.\n\n'
-          'Publish handoff: tag-triggered OIDC publishing is available '
-          'via the publish workflow (publish.yaml).';
+          'No release tags will be created for this plan.';
     }
 
     final buffer = StringBuffer()
@@ -269,7 +271,7 @@ class ReleasePlan {
     }
 
     buffer
-      ..writeln('### Future Tag Names')
+      ..writeln('### Post-Merge Tag Names')
       ..writeln();
     for (final c in candidates) {
       buffer.writeln('- `${c.packageName}/v<next-version>`');
@@ -277,8 +279,9 @@ class ReleasePlan {
     buffer
       ..writeln()
       ..writeln(
-        'Publish handoff: tag-triggered OIDC publishing is available '
-        'via the publish workflow (publish.yaml).',
+        'Version PR merge prepares validated release provenance. '
+        'After CI is green, the maintainer manually creates release tags. '
+        'Tags then trigger OIDC publishing via publish.yaml.',
       );
 
     return buffer.toString();
@@ -304,7 +307,9 @@ class ReleasePlan {
             },
           )
           .toList(),
-      'publishHandoff': 'tag-triggered OIDC publishing via publish.yaml',
+      'publishFlow':
+          'version PR merge prepares validated provenance; maintainer manually '
+          'creates tags; tags trigger OIDC publishing via publish.yaml',
     };
     return const JsonEncoder.withIndent('  ').convert(data);
   }
@@ -422,7 +427,7 @@ class ReleasePlanner {
 }
 
 // ---------------------------------------------------------------------------
-// Slice 3: Provenance, Tag Validation, Preflight, Major Detection
+// Provenance, tag validation, preflight, and major detection
 // ---------------------------------------------------------------------------
 
 /// Release provenance manifest committed during version-pr.
@@ -434,9 +439,15 @@ class ReleaseProvenance {
   const ReleaseProvenance({
     required this.packageName,
     required this.version,
+    required this.previousVersion,
+    required this.nextVersion,
     required this.bump,
     required this.changesetHashes,
     required this.changelogNotesHash,
+    required this.tag,
+    this.releaseAutomation = expectedReleaseAutomation,
+    this.changesetContents = const [],
+    this.impactProof = const [],
   });
 
   /// Parses provenance from a JSON string.
@@ -460,35 +471,66 @@ class ReleaseProvenance {
 
     final pkg = decoded['package'] as String?;
     final ver = decoded['version'] as String?;
+    final prevVer = decoded['previousVersion'] as String?;
+    final nextVer = decoded['nextVersion'] as String?;
     final bump = decoded['bump'] as String?;
     final hashes = decoded['changesetHashes'] as List<dynamic>?;
+    final contents = decoded['changesetContents'] as List<dynamic>?;
+    final impactProof = decoded['impactProof'] as List<dynamic>?;
     final notesHash = decoded['changelogNotesHash'] as String?;
+    final tag = decoded['tag'] as String?;
+    final releaseAutomation = decoded['releaseAutomation'] as String?;
 
     if (pkg == null ||
         ver == null ||
+        prevVer == null ||
+        nextVer == null ||
         bump == null ||
         hashes == null ||
-        notesHash == null) {
+        notesHash == null ||
+        tag == null ||
+        releaseAutomation == null) {
       throw const FormatException(
         'Provenance manifest is missing required fields '
-        '(package, version, bump, changesetHashes, changelogNotesHash).',
+        '(package, version, previousVersion, nextVersion, bump, '
+        'changesetHashes, changelogNotesHash, tag, releaseAutomation).',
       );
     }
 
     return ReleaseProvenance(
       packageName: pkg,
       version: ver,
+      previousVersion: prevVer,
+      nextVersion: nextVer,
       bump: bump,
       changesetHashes: hashes.cast<String>(),
+      changesetContents: contents?.cast<String>() ?? const [],
+      impactProof: impactProof?.cast<String>() ?? const [],
       changelogNotesHash: notesHash,
+      tag: tag,
+      releaseAutomation: releaseAutomation,
     );
   }
+
+  /// Required automation identity for release provenance emitted by version-pr.
+  static const String expectedReleaseAutomation =
+      'release_version_pr.version-pr.v1';
 
   /// Package name this provenance belongs to.
   final String packageName;
 
-  /// Release version.
+  /// Release version (nextVersion).
   final String version;
+
+  /// Version before the bump (previousVersion).
+  final String previousVersion;
+
+  /// Version after the bump (nextVersion).
+  ///
+  /// This intentionally duplicates [version], which remains the tag/pubspec
+  /// version, so validation can prove the committed version PR output and the
+  /// release tag are describing the same transition.
+  final String nextVersion;
 
   /// Bump level name (patch, minor, major).
   final String bump;
@@ -496,17 +538,41 @@ class ReleaseProvenance {
   /// Content hashes of source changesets that produced this release.
   final List<String> changesetHashes;
 
+  /// Immutable changeset contents captured by the version PR.
+  ///
+  /// Version PRs remove consumed changesets, so validation cannot rely on the
+  /// original markdown files still existing after merge. Capturing the source
+  /// contents here lets validation recompute [changesetHashes]
+  /// deterministically from committed provenance instead of trusting the hash
+  /// field alone.
+  final List<String> changesetContents;
+
+  /// Files that proved real package impact for this candidate.
+  final List<String> impactProof;
+
   /// Hash of the changelog notes for this release.
   final String changelogNotesHash;
+
+  /// Intended release tag (e.g., explicit_outcome/v0.1.0).
+  final String tag;
+
+  /// Release automation path that is allowed to create and push this tag.
+  final String releaseAutomation;
 
   /// Serializes provenance to deterministic JSON.
   String toJson() {
     final data = {
       'package': packageName,
       'version': version,
+      'previousVersion': previousVersion,
+      'nextVersion': nextVersion,
       'bump': bump,
       'changesetHashes': changesetHashes,
+      'changesetContents': changesetContents,
+      'impactProof': impactProof,
       'changelogNotesHash': changelogNotesHash,
+      'tag': tag,
+      'releaseAutomation': releaseAutomation,
     };
     return const JsonEncoder.withIndent('  ').convert(data);
   }
@@ -742,6 +808,84 @@ class ReleaseValidator {
           'match tag version "${tagInfo.version}".',
         );
       }
+      if (provenance.nextVersion != provenance.version) {
+        errors.add(
+          'Provenance nextVersion "${provenance.nextVersion}" does not '
+          'match provenance version "${provenance.version}".',
+        );
+      }
+
+      if (!_isValidBump(provenance.bump)) {
+        errors.add(
+          'Provenance bump "${provenance.bump}" is invalid. '
+          'Expected patch, minor, or major.',
+        );
+      }
+
+      // Validate provenance tag matches release tag.
+      final expectedTag = '${tagInfo.packageName}/v${tagInfo.version}';
+      if (provenance.tag != expectedTag) {
+        errors.add(
+          'Provenance tag "${provenance.tag}" does not match '
+          'release tag "$expectedTag".',
+        );
+      }
+
+      if (provenance.releaseAutomation !=
+          ReleaseProvenance.expectedReleaseAutomation) {
+        errors.add(
+          'Provenance releaseAutomation "${provenance.releaseAutomation}" '
+          'does not match the approved automation path '
+          '"${ReleaseProvenance.expectedReleaseAutomation}".',
+        );
+      }
+
+      // Validate previousVersion + bump → version consistency.
+      final expectedNextVersion = _computeExpectedNextVersion(
+        provenance.previousVersion,
+        provenance.bump,
+      );
+      if (expectedNextVersion != null &&
+          expectedNextVersion != provenance.nextVersion) {
+        errors.add(
+          'Provenance previousVersion "${provenance.previousVersion}" '
+          '+ bump "${provenance.bump}" should produce '
+          '"$expectedNextVersion" but provenance version is '
+          '"${provenance.nextVersion}".',
+        );
+      }
+
+      // Detect major bypass: if previousVersion → version implies major
+      // but provenance bump says patch or minor.
+      final impliedBump = _impliedBumpLevel(
+        provenance.previousVersion,
+        provenance.nextVersion,
+      );
+      if (impliedBump == 'major' && provenance.bump != 'major') {
+        errors.add(
+          'Provenance bump "${provenance.bump}" is inconsistent with '
+          'major version change from "${provenance.previousVersion}" '
+          'to "${provenance.version}". '
+          'Major releases require a changeset-declared major bump before the '
+          'maintainer creates the release tag.',
+        );
+      }
+
+      _validateImpactProof(
+        provenance: provenance,
+        tagPackage: tagInfo.packageName,
+        errors: errors,
+      );
+      _validateChangelogNotesHash(
+        provenance: provenance,
+        changelogContent: changelogContent,
+        tagVersion: tagInfo.version,
+        errors: errors,
+      );
+      _validateChangesetProof(
+        provenance: provenance,
+        errors: errors,
+      );
 
       // Extract provenance bump for major detection.
       provenanceBump = provenance.bump;
@@ -784,61 +928,206 @@ class ReleaseValidator {
     }
     return null;
   }
+
+  /// Computes the expected next version from previousVersion and bump.
+  ///
+  /// Returns null if the inputs are invalid.
+  static String? _computeExpectedNextVersion(
+    String previousVersion,
+    String bump,
+  ) {
+    final parts = previousVersion.split('.');
+    if (parts.length != 3) return null;
+
+    final major = int.tryParse(parts[0]);
+    final minor = int.tryParse(parts[1]);
+    final patch = int.tryParse(parts[2]);
+
+    if (major == null || minor == null || patch == null) return null;
+
+    switch (bump) {
+      case 'patch':
+        return '$major.$minor.${patch + 1}';
+      case 'minor':
+        return '$major.${minor + 1}.0';
+      case 'major':
+        return '${major + 1}.0.0';
+      default:
+        return null;
+    }
+  }
+
+  /// Returns true when [bump] is an allowed release bump value.
+  static bool _isValidBump(String bump) {
+    return bump == 'patch' || bump == 'minor' || bump == 'major';
+  }
+
+  static void _validateImpactProof({
+    required ReleaseProvenance provenance,
+    required String tagPackage,
+    required List<String> errors,
+  }) {
+    if (provenance.impactProof.isEmpty) {
+      errors.add(
+        'Provenance impactProof is required and must contain at least one '
+        'real impacted file for $tagPackage.',
+      );
+      return;
+    }
+
+    final packagePrefix = 'packages/$tagPackage/';
+    final invalid = provenance.impactProof
+        .where((path) => path.trim().isEmpty || !path.startsWith(packagePrefix))
+        .toList();
+    if (invalid.isNotEmpty) {
+      errors.add(
+        'Provenance impactProof contains files outside $packagePrefix: '
+        '${invalid.join(', ')}.',
+      );
+    }
+  }
+
+  static void _validateChangelogNotesHash({
+    required ReleaseProvenance provenance,
+    required String changelogContent,
+    required String tagVersion,
+    required List<String> errors,
+  }) {
+    final notes = _extractChangelogNotesForVersion(
+      changelogContent,
+      tagVersion,
+    );
+    if (notes == null) {
+      errors.add(
+        'Cannot validate changelogNotesHash because changelog notes for '
+        '$tagVersion could not be extracted.',
+      );
+      return;
+    }
+
+    final actualHash = ReleaseProvenance.computeContentHash(notes);
+    if (actualHash != provenance.changelogNotesHash) {
+      errors.add(
+        'Provenance changelogNotesHash "${provenance.changelogNotesHash}" '
+        'does not match recomputed changelog notes hash "$actualHash".',
+      );
+    }
+  }
+
+  static void _validateChangesetProof({
+    required ReleaseProvenance provenance,
+    required List<String> errors,
+  }) {
+    if (provenance.changesetContents.isEmpty) {
+      errors.add(
+        'Provenance changesetContents is required to recompute '
+        'changesetHashes after consumed changesets are removed.',
+      );
+      return;
+    }
+
+    final actualHashes = provenance.changesetContents
+        .map(ReleaseProvenance.computeContentHash)
+        .toList();
+    if (!_sameStringList(actualHashes, provenance.changesetHashes)) {
+      errors.add(
+        'Provenance changesetHashes do not match recomputed hashes from '
+        'changesetContents. Expected ${actualHashes.join(', ')}.',
+      );
+    }
+
+    final packageDeclaration = '${provenance.packageName}:';
+    if (!provenance.changesetContents.any(
+      (content) => content.contains(packageDeclaration),
+    )) {
+      errors.add(
+        'Provenance changesetContents do not declare '
+        '${provenance.packageName}.',
+      );
+    }
+  }
+
+  static String? _extractChangelogNotesForVersion(
+    String changelogContent,
+    String version,
+  ) {
+    final lines = changelogContent.split('\n');
+    final notes = <String>[];
+    var inSection = false;
+
+    for (final line in lines) {
+      if (line.startsWith('## ')) {
+        if (inSection) break;
+        final heading = line.substring(3).trim();
+        if (heading == version || heading.startsWith('$version ')) {
+          inSection = true;
+        }
+        continue;
+      }
+
+      if (inSection) {
+        notes.add(line);
+      }
+    }
+
+    if (!inSection) return null;
+    return notes.join('\n').trim();
+  }
+
+  static bool _sameStringList(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  /// Determines the implied bump level from previousVersion to nextVersion.
+  ///
+  /// Returns 'major', 'minor', 'patch', or 'unknown'.
+  static String _impliedBumpLevel(String previousVersion, String nextVersion) {
+    final prevParts = previousVersion.split('.');
+    final nextParts = nextVersion.split('.');
+    if (prevParts.length != 3 || nextParts.length != 3) return 'unknown';
+
+    final prevMajor = int.tryParse(prevParts[0]);
+    final nextMajor = int.tryParse(nextParts[0]);
+
+    if (prevMajor == null || nextMajor == null) return 'unknown';
+
+    if (nextMajor > prevMajor) return 'major';
+
+    final prevMinor = int.tryParse(prevParts[1]);
+    final nextMinor = int.tryParse(nextParts[1]);
+
+    if (prevMinor == null || nextMinor == null) return 'unknown';
+
+    if (nextMinor > prevMinor) return 'minor';
+
+    return 'patch';
+  }
 }
 
 /// Detects whether a release tag represents a major version bump.
 ///
-/// Primary detection uses the provenance `bump` field (committed during
-/// version-pr). Falls back to comparing tag major vs pubspec major when
-/// provenance is unavailable (legacy path).
+/// Detection uses the provenance `bump` field committed during version-pr.
+/// Without provenance, validation fails closed and this detector does not
+/// infer release class from weaker tag/pubspec state.
 class MajorDetector {
   /// Returns true if the release is a major version bump.
   ///
-  /// When [provenanceBump] is provided (normal path), uses it directly:
+  /// When [provenanceBump] is provided, uses it directly:
   /// `major` → true, anything else → false.
-  ///
-  /// When [provenanceBump] is null (fallback), compares tag major to
-  /// pubspec major: strictly greater → true.
   static bool isMajorRelease({
     required String tagVersion,
     required String pubspecContent,
     String? provenanceBump,
   }) {
-    // Primary: use provenance bump (authoritative source).
     if (provenanceBump != null) {
       return provenanceBump == 'major';
     }
 
-    // Fallback: compare tag major to pubspec major.
-    final tagMajor = _parseMajor(tagVersion);
-    final pubspecVersion = _readVersionFromPubspec(pubspecContent);
-    if (pubspecVersion == null || tagMajor == null) return false;
-
-    final pubspecMajor = _parseMajor(pubspecVersion);
-    if (pubspecMajor == null) return false;
-
-    return tagMajor > pubspecMajor;
-  }
-
-  /// Extracts the major version number from a semver string.
-  static int? _parseMajor(String version) {
-    final corePart = version.contains('-')
-        ? version.substring(0, version.indexOf('-'))
-        : version;
-    final parts = corePart.split('.');
-    if (parts.isEmpty) return null;
-    return int.tryParse(parts[0]);
-  }
-
-  /// Reads the `version:` field from pubspec content.
-  static String? _readVersionFromPubspec(String pubspecContent) {
-    for (final line in pubspecContent.split('\n')) {
-      if (line.startsWith('version:') || line.startsWith('version :')) {
-        final colonIdx = line.indexOf(':');
-        return line.substring(colonIdx + 1).trim();
-      }
-    }
-    return null;
+    return false;
   }
 }
 
@@ -873,6 +1162,610 @@ class PreflightResult {
   final List<String> errors;
 }
 
+// ---------------------------------------------------------------------------
+// Corrective Slice 1: Content-Aware Impact Classifier + Reconciliation
+// ---------------------------------------------------------------------------
+
+/// A changed file with optional diff content for impact analysis.
+///
+/// When [diffContent] is provided, the classifier performs content-aware
+/// analysis to distinguish real code changes from comment/whitespace-only
+/// changes. When absent, the classifier falls back to path-based analysis.
+class ChangedFile {
+  const ChangedFile({required this.path, this.diffContent});
+
+  /// File path relative to the repository root.
+  final String path;
+
+  /// Unified diff content for the file (optional).
+  ///
+  /// When provided, enables content-aware analysis for Dart files.
+  final String? diffContent;
+}
+
+/// Classification category for a changed file's impact.
+enum ImpactCategory {
+  /// Real code/token changes that affect package behavior.
+  realImpact,
+
+  /// Documentation-only changes (README, CHANGELOG, .md files).
+  docsOnly,
+
+  /// Test-only changes (no production impact).
+  testOnly,
+
+  /// Example-only changes (no published API impact).
+  exampleOnly,
+
+  /// Dart file with only comment changes (no token changes).
+  commentOnly,
+
+  /// Dart file with only whitespace/formatting changes.
+  whitespaceOnly,
+
+  /// File is not under a publishable package path.
+  notPublishable,
+}
+
+/// Classification result for a single changed file.
+class FileClassification {
+  const FileClassification({
+    required this.filePath,
+    required this.category,
+    required this.packageName,
+  });
+
+  /// File path relative to the repository root.
+  final String filePath;
+
+  /// The determined impact category.
+  final ImpactCategory category;
+
+  /// Package name if the file belongs to a known package, null otherwise.
+  final String? packageName;
+}
+
+/// Aggregated package-level impact from all changed files.
+class PackageImpact {
+  const PackageImpact({
+    required this.packageName,
+    required this.hasRealImpact,
+    required this.impactedFiles,
+    required this.ignoredFiles,
+  });
+
+  /// Package name.
+  final String packageName;
+
+  /// Whether the package has at least one real code change.
+  final bool hasRealImpact;
+
+  /// Files that contribute real impact.
+  final List<String> impactedFiles;
+
+  /// Files that were ignored (docs, comments, whitespace, etc.).
+  final List<String> ignoredFiles;
+}
+
+/// Result of content-aware impact classification across all changed files.
+class ImpactClassification {
+  const ImpactClassification({
+    required this.packageImpacts,
+    required this.classifications,
+  });
+
+  /// Per-package aggregated impact.
+  final Map<String, PackageImpact> packageImpacts;
+
+  /// Individual file classifications.
+  final List<FileClassification> classifications;
+
+  /// Package names that have real impact (sorted).
+  List<String> get impactedPackages {
+    return packageImpacts.entries
+        .where((e) => e.value.hasRealImpact)
+        .map((e) => e.key)
+        .toList()
+      ..sort();
+  }
+}
+
+/// Analyzes unified diffs for Dart files to detect real code token changes.
+///
+/// Strips comments (single-line `//`, doc `///`, block `/* */`) and
+/// whitespace from diff lines, then checks if any meaningful tokens remain
+/// in the additions or removals.
+class DartDiffAnalyzer {
+  /// Returns true if the diff contains real Dart code token changes.
+  ///
+  /// Analyzes only `+` and `-` lines from unified diff format.
+  /// Strips comments (including multi-line block comments) and normalizes
+  /// whitespace; if the resulting token streams differ, the change is
+  /// considered real.
+  static bool hasRealCodeChanges(String diffContent) {
+    if (diffContent.trim().isEmpty) return false;
+
+    final lines = diffContent.split('\n');
+    final addedLines = <String>[];
+    final removedLines = <String>[];
+
+    for (final line in lines) {
+      if (line.startsWith('+') && !line.startsWith('+++')) {
+        addedLines.add(line.substring(1));
+      } else if (line.startsWith('-') && !line.startsWith('---')) {
+        removedLines.add(line.substring(1));
+      }
+    }
+
+    // Strip comments (tracking block comment state across lines) and
+    // normalize whitespace to produce token streams.
+    final addedTokens = _extractTokens(addedLines);
+    final removedTokens = _extractTokens(removedLines);
+
+    // If both token streams are empty, only comments/whitespace changed.
+    if (addedTokens.isEmpty && removedTokens.isEmpty) return false;
+
+    // If token streams are identical, it's a format/whitespace-only change.
+    if (addedTokens == removedTokens) return false;
+
+    return true;
+  }
+
+  /// Extracts a normalized token string from a list of diff lines,
+  /// stripping comments (including multi-line block comments) and
+  /// collapsing all whitespace.
+  static String _extractTokens(List<String> lines) {
+    final buffer = StringBuffer();
+    var inBlockComment = false;
+
+    for (final line in lines) {
+      var current = line;
+
+      // Handle multi-line block comment continuation.
+      if (inBlockComment) {
+        final endIdx = current.indexOf('*/');
+        if (endIdx == -1) {
+          continue; // entire line is inside block comment
+        }
+        current = current.substring(endIdx + 2);
+        inBlockComment = false;
+      }
+
+      // Process the remaining content for comments.
+      final processed = _stripAllComments(current);
+      if (processed.inBlockComment) {
+        inBlockComment = true;
+      }
+      buffer
+        ..write(processed.text)
+        ..write(' ');
+    }
+
+    // Normalize: strip all whitespace to detect format-only changes.
+    return buffer.toString().replaceAll(RegExp(r'\s+'), '');
+  }
+
+  /// Result of stripping comments from a line.
+  static _StripResult _stripAllComments(String line) {
+    final buffer = StringBuffer();
+    var i = 0;
+    var inSingleQuote = false;
+    var inDoubleQuote = false;
+
+    while (i < line.length) {
+      final ch = line[i];
+
+      // Check for single-line comment.
+      if (!inSingleQuote &&
+          !inDoubleQuote &&
+          ch == '/' &&
+          i + 1 < line.length &&
+          line[i + 1] == '/') {
+        // Rest of line is a comment.
+        break;
+      }
+
+      // Check for block comment start.
+      if (!inSingleQuote &&
+          !inDoubleQuote &&
+          ch == '/' &&
+          i + 1 < line.length &&
+          line[i + 1] == '*') {
+        // Find the end of the block comment on this line.
+        final endIdx = line.indexOf('*/', i + 2);
+        if (endIdx != -1) {
+          i = endIdx + 2;
+          continue;
+        } else {
+          // Block comment continues to next lines.
+          return _StripResult(
+            text: buffer.toString(),
+            inBlockComment: true,
+          );
+        }
+      }
+
+      // Track string literals.
+      if (ch == "'" && !inDoubleQuote) {
+        inSingleQuote = !inSingleQuote;
+      } else if (ch == '"' && !inSingleQuote) {
+        inDoubleQuote = !inDoubleQuote;
+      }
+
+      buffer.write(ch);
+      i++;
+    }
+
+    return _StripResult(
+      text: buffer.toString(),
+      inBlockComment: false,
+    );
+  }
+}
+
+/// Internal result of stripping comments from a single line.
+class _StripResult {
+  const _StripResult({required this.text, required this.inBlockComment});
+
+  /// The line content after removing comments.
+  final String text;
+
+  /// Whether a block comment was opened and not closed on this line.
+  final bool inBlockComment;
+}
+
+/// Content-aware impact classifier for Dart package source changes.
+///
+/// Classifies each changed file into an [ImpactCategory] based on its
+/// path and optional diff content. Aggregates results per-package to
+/// determine which packages have real impact.
+class ImpactClassifier {
+  /// Classifies a list of changed files into impact categories.
+  ///
+  /// For Dart files under `lib/`, uses [DartDiffAnalyzer] when diff
+  /// content is available to distinguish real code changes from
+  /// comment-only or whitespace-only changes.
+  static ImpactClassification classify(List<ChangedFile> files) {
+    final classifications = <FileClassification>[];
+    final packageFiles = <String, List<FileClassification>>{};
+
+    for (final file in files) {
+      final classification = _classifyFile(file);
+      classifications.add(classification);
+
+      if (classification.packageName != null) {
+        packageFiles
+            .putIfAbsent(classification.packageName!, () => [])
+            .add(classification);
+      }
+    }
+
+    // Aggregate per-package impact.
+    final packageImpacts = <String, PackageImpact>{};
+    for (final entry in packageFiles.entries) {
+      final pkg = entry.key;
+      final fileClassifications = entry.value;
+      final impacted = fileClassifications
+          .where((c) => c.category == ImpactCategory.realImpact)
+          .map((c) => c.filePath)
+          .toList();
+      final ignored = fileClassifications
+          .where((c) => c.category != ImpactCategory.realImpact)
+          .map((c) => c.filePath)
+          .toList();
+
+      packageImpacts[pkg] = PackageImpact(
+        packageName: pkg,
+        hasRealImpact: impacted.isNotEmpty,
+        impactedFiles: impacted,
+        ignoredFiles: ignored,
+      );
+    }
+
+    return ImpactClassification(
+      packageImpacts: packageImpacts,
+      classifications: classifications,
+    );
+  }
+
+  /// Classifies a single file based on its path and optional diff content.
+  static FileClassification _classifyFile(ChangedFile file) {
+    final path = file.path;
+
+    // Determine package ownership.
+    final pkg = PublishableClassifier.packageName(path);
+    if (pkg == null) {
+      return FileClassification(
+        filePath: path,
+        category: ImpactCategory.notPublishable,
+        packageName: null,
+      );
+    }
+
+    final prefix = 'packages/$pkg/';
+    final relative = path.substring(prefix.length);
+
+    // Test files → testOnly.
+    if (relative.startsWith('test/')) {
+      return FileClassification(
+        filePath: path,
+        category: ImpactCategory.testOnly,
+        packageName: pkg,
+      );
+    }
+
+    // Example files → exampleOnly.
+    if (relative.startsWith('example/')) {
+      return FileClassification(
+        filePath: path,
+        category: ImpactCategory.exampleOnly,
+        packageName: pkg,
+      );
+    }
+
+    // Documentation files → docsOnly.
+    if (_isDocFile(relative)) {
+      return FileClassification(
+        filePath: path,
+        category: ImpactCategory.docsOnly,
+        packageName: pkg,
+      );
+    }
+
+    // pubspec.yaml → always real impact.
+    if (relative == 'pubspec.yaml') {
+      return FileClassification(
+        filePath: path,
+        category: ImpactCategory.realImpact,
+        packageName: pkg,
+      );
+    }
+
+    // lib/** files — content-aware analysis if diff available.
+    if (relative.startsWith('lib/')) {
+      if (file.diffContent != null) {
+        final hasReal = DartDiffAnalyzer.hasRealCodeChanges(
+          file.diffContent!,
+        );
+        if (!hasReal) {
+          // Determine if it's comment-only or whitespace-only.
+          final category = _classifyNonRealDiff(file.diffContent!);
+          return FileClassification(
+            filePath: path,
+            category: category,
+            packageName: pkg,
+          );
+        }
+      }
+      // Real change or no diff to analyze (fallback: assume real).
+      return FileClassification(
+        filePath: path,
+        category: ImpactCategory.realImpact,
+        packageName: pkg,
+      );
+    }
+
+    // Other package files (e.g., build.yaml) → not publishable.
+    return FileClassification(
+      filePath: path,
+      category: ImpactCategory.notPublishable,
+      packageName: pkg,
+    );
+  }
+
+  /// Returns true if the relative path is a documentation file.
+  static bool _isDocFile(String relativePath) {
+    final lower = relativePath.toLowerCase();
+    if (lower.endsWith('.md')) return true;
+    if (lower == 'readme') return true;
+    if (lower == 'changelog') return true;
+    if (lower == 'license') return true;
+    return false;
+  }
+
+  /// Classifies a non-real diff as comment-only or whitespace-only.
+  static ImpactCategory _classifyNonRealDiff(String diffContent) {
+    final lines = diffContent.split('\n');
+    var hasCommentContent = false;
+
+    for (final line in lines) {
+      if (line.startsWith('+') && !line.startsWith('+++')) {
+        final content = line.substring(1).trim();
+        if (content.startsWith('//') ||
+            content.startsWith('///') ||
+            content.startsWith('/*') ||
+            content.startsWith('*') ||
+            content.endsWith('*/')) {
+          hasCommentContent = true;
+        }
+      } else if (line.startsWith('-') && !line.startsWith('---')) {
+        final content = line.substring(1).trim();
+        if (content.startsWith('//') ||
+            content.startsWith('///') ||
+            content.startsWith('/*') ||
+            content.startsWith('*') ||
+            content.endsWith('*/')) {
+          hasCommentContent = true;
+        }
+      }
+    }
+
+    return hasCommentContent
+        ? ImpactCategory.commentOnly
+        : ImpactCategory.whitespaceOnly;
+  }
+}
+
+/// A package that has real impact but no matching changeset intent.
+class MissingIntentFailure {
+  const MissingIntentFailure({
+    required this.packageName,
+    required this.remediation,
+  });
+
+  /// Package name that needs a changeset.
+  final String packageName;
+
+  /// Human-readable remediation instructions.
+  final String remediation;
+}
+
+/// A changeset intent that has no corresponding real package impact.
+class UnusedIntentWarning {
+  const UnusedIntentWarning({
+    required this.packageName,
+    required this.reason,
+  });
+
+  /// Package name with unused intent.
+  final String packageName;
+
+  /// Explanation of why the intent is unused.
+  final String reason;
+}
+
+/// Result of reconciling real impact with changeset intent.
+///
+/// Release candidates are `intent ∩ realImpact`.
+/// Missing intent failures are `realImpact - intent`.
+/// Unused intent warnings are `intent - realImpact`.
+class ReconciliationResult {
+  const ReconciliationResult({
+    required this.releaseCandidates,
+    required this.missingIntentFailures,
+    required this.unusedIntentWarnings,
+  });
+
+  /// Packages with both intent and real impact (in publish order).
+  final List<ReleaseCandidate> releaseCandidates;
+
+  /// Packages with real impact but no changeset (CI must fail).
+  final List<MissingIntentFailure> missingIntentFailures;
+
+  /// Packages with changeset but no real impact (surfaced, excluded).
+  final List<UnusedIntentWarning> unusedIntentWarnings;
+
+  /// Whether any failures exist (CI should fail when true).
+  bool get hasFailures => missingIntentFailures.isNotEmpty;
+}
+
+/// Reconciles real package impact with changeset intent.
+///
+/// Produces three outputs:
+/// - Release candidates: packages with both intent and real impact.
+/// - Missing intent failures: packages with real impact but no changeset.
+/// - Unused intent warnings: changesets with no real package impact.
+class ReleaseReconciler {
+  /// Reconciles changed files against changesets.
+  ///
+  /// Uses [ImpactClassifier] for content-aware impact detection and
+  /// compares it against changeset-declared intent.
+  static ReconciliationResult reconcile({
+    required List<ChangedFile> changedFiles,
+    required List<Changeset> changesets,
+  }) {
+    // Step 1: Classify real impact.
+    final classification = ImpactClassifier.classify(changedFiles);
+    final impactedPackages = classification.impactedPackages.toSet();
+
+    // Step 2: Collect changeset intent.
+    final intentPackages = <String, BumpLevel>{};
+    final intentNotes = <String, List<String>>{};
+    for (final cs in changesets) {
+      for (final entry in cs.bumps.entries) {
+        final pkg = entry.key;
+        final bump = entry.value;
+        final existing = intentPackages[pkg];
+        intentPackages[pkg] = existing == null
+            ? bump
+            : BumpLevel.max([existing, bump]);
+        intentNotes.putIfAbsent(pkg, () => <String>[]);
+        if (cs.notes.isNotEmpty) {
+          intentNotes[pkg]!.add(cs.notes);
+        }
+      }
+    }
+
+    // Step 3: Compute sets.
+    // intent ∩ realImpact → release candidates
+    final candidateNames =
+        impactedPackages.where(intentPackages.containsKey).toList()
+          ..sort((a, b) {
+            if (a == 'explicit_outcome') return -1;
+            if (b == 'explicit_outcome') return 1;
+            return a.compareTo(b);
+          });
+
+    // realImpact - intent → missing intent failures
+    final missingIntentNames =
+        impactedPackages
+            .where((pkg) => !intentPackages.containsKey(pkg))
+            .toList()
+          ..sort();
+
+    // intent - realImpact → unused intent warnings
+    final unusedIntentNames =
+        intentPackages.keys
+            .where((pkg) => !impactedPackages.contains(pkg))
+            .toList()
+          ..sort();
+
+    // Build candidates.
+    final candidates = candidateNames
+        .map(
+          (name) => ReleaseCandidate(
+            packageName: name,
+            bump: intentPackages[name]!,
+            notes: (intentNotes[name] ?? []).join('\n'),
+            impactProof:
+                classification.packageImpacts[name]?.impactedFiles ?? const [],
+          ),
+        )
+        .toList();
+
+    // Build failures.
+    final failures = missingIntentNames
+        .map(
+          (name) => MissingIntentFailure(
+            packageName: name,
+            remediation: _buildRemediation(name),
+          ),
+        )
+        .toList();
+
+    // Build warnings.
+    final warnings = unusedIntentNames
+        .map(
+          (name) => UnusedIntentWarning(
+            packageName: name,
+            reason:
+                'Changeset declares intent for $name but '
+                'no real package impact was detected. '
+                'The changeset will be excluded from release candidates.',
+          ),
+        )
+        .toList();
+
+    return ReconciliationResult(
+      releaseCandidates: candidates,
+      missingIntentFailures: failures,
+      unusedIntentWarnings: warnings,
+    );
+  }
+
+  /// Builds a remediation message for a package missing a changeset.
+  static String _buildRemediation(String packageName) {
+    return 'Missing changeset for: $packageName\n'
+        '\n'
+        'Create a changeset with:\n'
+        '  dart run tool/release_changeset.dart init '
+        '--package=$packageName --bump=patch '
+        '--summary="Describe your change"\n'
+        '\n'
+        'See .changesets/README.md for format details.';
+  }
+}
+
 /// Preflight check: verifies that `explicit`'s dependency on
 /// `explicit_outcome` is satisfied by published versions on pub.dev.
 ///
@@ -904,7 +1797,8 @@ class DependencyPreflight {
     try {
       metadata = metadataFetcher('explicit_outcome');
     } on Exception catch (e) {
-      final msg = 'Failed to fetch pub.dev metadata for '
+      final msg =
+          'Failed to fetch pub.dev metadata for '
           'explicit_outcome: $e. Failing closed — cannot '
           'verify dependency availability.';
       return PreflightResult(
@@ -926,7 +1820,8 @@ class DependencyPreflight {
         (v) => _satisfiesCaret(v, requiredVersion),
       );
       if (satisfying.isEmpty) {
-        final msg = 'No published version of explicit_outcome '
+        final msg =
+            'No published version of explicit_outcome '
             'satisfies constraint ^$requiredVersion. '
             'explicit_outcome must be published before explicit.';
         return PreflightResult(

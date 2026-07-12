@@ -95,9 +95,11 @@ melos:
 
     release:plan:
       description: >
-        Render the release plan from existing changesets.
-        Shows candidates, bumps, changelog notes, and dependency updates.
-        Usage: melos run release:plan [-- --format=markdown|json]
+        Render the release plan from existing changesets plus explicit diff
+        context. Shows candidates, bumps, changelog notes, and dependency
+        updates. Usage: melos run release:plan -- --base=<sha> --head=<sha>
+        [--format=markdown|json] or melos run release:plan --
+        --changed-files=<comma-separated-files> [--format=markdown|json]
       run: dart run tool/release_changeset.dart plan
 
     release:version-pr:

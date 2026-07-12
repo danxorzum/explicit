@@ -130,7 +130,7 @@ Process.run('dart', ['pub', 'publish', '--force'], ...);
 
     group('assertSafeContent with workflow/job allowlist', () {
       test(
-        'allows id-token: write in publish.yaml::publish_patch_minor',
+        'allows id-token: write in publish.yaml::publish_package',
         () {
           const content = '''
 permissions:
@@ -140,53 +140,22 @@ permissions:
           final result = PublishSafety.assertSafeContent(
             content,
             workflow: 'publish.yaml',
-            job: 'publish_patch_minor',
+            job: 'publish_package',
           );
           expect(result.isSafe, isTrue);
         },
       );
 
-      test('allows id-token: write in publish.yaml::publish_major', () {
-        const content = '''
-permissions:
-  id-token: write
-  contents: read
-''';
-        final result = PublishSafety.assertSafeContent(
-          content,
-          workflow: 'publish.yaml',
-          job: 'publish_major',
-        );
-        expect(result.isSafe, isTrue);
-      });
-
-      test('allows dart pub publish in publish.yaml::publish_patch_minor', () {
+      test('allows dart pub publish in publish.yaml::publish_package', () {
         const content = '''
 run: dart pub publish
 ''';
         final result = PublishSafety.assertSafeContent(
           content,
           workflow: 'publish.yaml',
-          job: 'publish_patch_minor',
+          job: 'publish_package',
         );
         // dart pub publish (without --force) is allowed in the publish job.
-        expect(
-          result.violations.where(
-            (v) => v.rule == PublishSafety.noForcePublishRule,
-          ),
-          isEmpty,
-        );
-      });
-
-      test('allows dart pub publish in publish.yaml::publish_major', () {
-        const content = '''
-run: dart pub publish
-''';
-        final result = PublishSafety.assertSafeContent(
-          content,
-          workflow: 'publish.yaml',
-          job: 'publish_major',
-        );
         expect(
           result.violations.where(
             (v) => v.rule == PublishSafety.noForcePublishRule,
@@ -275,7 +244,7 @@ env:
           final resultPatch = PublishSafety.assertSafeContent(
             content,
             workflow: 'publish.yaml',
-            job: 'publish_patch_minor',
+            job: 'publish_package',
           );
           expect(resultPatch.isSafe, isFalse);
           expect(
@@ -284,13 +253,6 @@ env:
             ),
             isTrue,
           );
-
-          final resultMajor = PublishSafety.assertSafeContent(
-            content,
-            workflow: 'publish.yaml',
-            job: 'publish_major',
-          );
-          expect(resultMajor.isSafe, isFalse);
         },
       );
 
@@ -304,14 +266,14 @@ env:
           final result = PublishSafety.assertSafeContent(
             content,
             workflow: 'publish.yaml',
-            job: 'publish_major',
+            job: 'publish_package',
           );
           expect(result.isSafe, isFalse);
         },
       );
 
       test(
-        'dart pub publish --force still forbidden even in publish jobs',
+        'allows dart pub publish --force in publish.yaml::publish_package',
         () {
           const content = '''
 run: dart pub publish --force
@@ -319,17 +281,37 @@ run: dart pub publish --force
           final result = PublishSafety.assertSafeContent(
             content,
             workflow: 'publish.yaml',
-            job: 'publish_patch_minor',
+            job: 'publish_package',
           );
-          expect(result.isSafe, isFalse);
           expect(
-            result.violations.any(
+            result.violations.where(
               (v) => v.rule == PublishSafety.noForcePublishRule,
             ),
-            isTrue,
+            isEmpty,
+            reason:
+                '--force is required for non-interactive trusted publishing '
+                'and allowed only in approved publish jobs.',
           );
         },
       );
+
+      test('denies dart pub publish --force outside approved publish jobs', () {
+        const content = '''
+run: dart pub publish --force
+''';
+        final result = PublishSafety.assertSafeContent(
+          content,
+          workflow: 'publish.yaml',
+          job: 'validate_release',
+        );
+        expect(result.isSafe, isFalse);
+        expect(
+          result.violations.any(
+            (v) => v.rule == PublishSafety.noForcePublishRule,
+          ),
+          isTrue,
+        );
+      });
 
       // Regression: plain `dart pub publish` (no --force, no --dry-run)
       // must be denied in non-approved workflows/jobs.
@@ -440,7 +422,7 @@ run: dart pub publish
       );
 
       test(
-        'allows plain dart pub publish in publish.yaml::publish_patch_minor',
+        'allows plain dart pub publish in publish.yaml::publish_package',
         () {
           const content = '''
       - name: Publish package
@@ -449,7 +431,7 @@ run: dart pub publish
           final result = PublishSafety.assertSafeContent(
             content,
             workflow: 'publish.yaml',
-            job: 'publish_patch_minor',
+            job: 'publish_package',
           );
           expect(
             result.violations.where(
@@ -457,27 +439,6 @@ run: dart pub publish
             ),
             isEmpty,
             reason: 'Approved publish job may use plain dart pub publish',
-          );
-        },
-      );
-
-      test(
-        'allows plain dart pub publish in publish.yaml::publish_major',
-        () {
-          const content = '''
-      - name: Publish package
-        run: dart pub publish
-''';
-          final result = PublishSafety.assertSafeContent(
-            content,
-            workflow: 'publish.yaml',
-            job: 'publish_major',
-          );
-          expect(
-            result.violations.where(
-              (v) => v.rule == PublishSafety.noPlainPublishRule,
-            ),
-            isEmpty,
           );
         },
       );
@@ -520,13 +481,15 @@ run: dart pub publish --dry-run
       });
 
       test('isSafe is false when violations exist', () {
-        const result = SafetyResult(violations: [
-          SafetyViolation(
-            rule: 'test',
-            line: 1,
-            matchedText: 'bad',
-          ),
-        ]);
+        const result = SafetyResult(
+          violations: [
+            SafetyViolation(
+              rule: 'test',
+              line: 1,
+              matchedText: 'bad',
+            ),
+          ],
+        );
         expect(result.isSafe, isFalse);
       });
     });

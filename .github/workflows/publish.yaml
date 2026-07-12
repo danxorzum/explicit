@@ -1,21 +1,16 @@
 # Publish — tag-triggered pub.dev trusted publishing via GitHub OIDC.
 #
-# Maintainer setup assumptions:
-#   - Configure pub.dev trusted publishing for each package
-#     (explicit_outcome and explicit). First manual upload may be
-#     required by pub.dev before trusted publishing is available.
-#   - Tag pattern: <package>/v<semver>
-#     e.g. explicit_outcome/v0.1.0, explicit/v0.0.2
-#   - Create protected GitHub Environment "release-major" for major
-#     release approval. Major publish jobs wait for this environment.
-#   - No long-lived pub.dev credentials are needed or used.
-#     Publishing relies solely on OIDC trusted publishing.
-#   - Publish order: explicit_outcome before explicit when both
-#     release tags are pushed.
+# Maintainer release sequence:
+#   1. Merge the automated release/version PR after CI is green.
+#   2. Manually create and push release tags that match committed provenance:
+#      <package>/v<semver>, for example explicit_outcome/v0.1.0.
+#   3. If both packages release, push explicit_outcome first. Wait until the
+#      required explicit_outcome version is visible on pub.dev before pushing
+#      the dependent explicit tag.
 #
-# Rollback: delete this workflow and remove the safety allowlist entry
-# in tool/src/publish_safety.dart. Version PR automation and changeset
-# CI remain publish-free and unaffected.
+# Manual tag creation is the approval boundary for every release class, so this
+# workflow intentionally has no patch/minor vs major environment split.
+# Publishing uses OIDC trusted publishing only; no long-lived pub.dev tokens.
 
 name: Publish
 
@@ -29,15 +24,12 @@ permissions:
   contents: read
 
 jobs:
-  # Job 1: Validate release tag against pubspec, changelog, provenance.
-  # No OIDC, no Environment, no publish permissions.
   validate_release:
     name: "Validate release tag"
     runs-on: ubuntu-latest
     outputs:
       package: ${{ steps.validate.outputs.package }}
       version: ${{ steps.validate.outputs.version }}
-      major: ${{ steps.validate.outputs.major }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -55,26 +47,27 @@ jobs:
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
           echo "Validating tag: $TAG"
+
+          TAG_TARGET=$(git rev-list -n 1 "$TAG")
+          HEAD_COMMIT=$(git rev-parse HEAD)
+          if [ "$TAG_TARGET" != "$HEAD_COMMIT" ]; then
+            echo "Release tag target check failed: $TAG points to $TAG_TARGET, checkout is $HEAD_COMMIT."
+            exit 1
+          fi
+
           RESULT=$(dart run tool/release_changeset.dart validate-release --tag="$TAG")
           echo "$RESULT"
 
-          # Parse outputs from validate-release JSON.
           PACKAGE=$(echo "$RESULT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d['package'])")
           VERSION=$(echo "$RESULT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d['version'])")
-          MAJOR=$(echo "$RESULT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(str(d['isMajor']).lower())")
 
           echo "package=$PACKAGE" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "major=$MAJOR" >> "$GITHUB_OUTPUT"
+          echo "Validated: $PACKAGE v$VERSION"
 
-          echo "Validated: $PACKAGE v$VERSION (major=$MAJOR)"
-
-  # Job 2: Publish patch/minor releases via OIDC trusted publishing.
-  # Runs only when the release is NOT a major version.
-  publish_patch_minor:
-    name: "Publish patch/minor"
+  publish_package:
+    name: "Publish package"
     needs: validate_release
-    if: needs.validate_release.outputs.major == 'false'
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -91,29 +84,4 @@ jobs:
 
       - name: Publish ${{ needs.validate_release.outputs.package }}
         working-directory: packages/${{ needs.validate_release.outputs.package }}
-        run: dart pub publish
-
-  # Job 3: Publish major releases via OIDC trusted publishing.
-  # Requires approval on the protected "release-major" Environment.
-  publish_major:
-    name: "Publish major"
-    needs: validate_release
-    if: needs.validate_release.outputs.major == 'true'
-    runs-on: ubuntu-latest
-    environment: release-major
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: dart-lang/setup-dart@v1
-        with:
-          sdk: "3.12.0"
-
-      - name: Install workspace dependencies
-        run: dart pub get
-
-      - name: Publish ${{ needs.validate_release.outputs.package }}
-        working-directory: packages/${{ needs.validate_release.outputs.package }}
-        run: dart pub publish
+        run: dart pub publish --force

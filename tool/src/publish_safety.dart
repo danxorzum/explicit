@@ -32,14 +32,13 @@ class SafetyResult {
 
 /// Static safety assertions for publish-related code.
 ///
-/// Slice 3: workflow/job-aware allowlist.
+/// Workflow/job-aware allowlist.
 /// - Credentials (`PUB_TOKEN`, `PUB_CREDENTIALS`) are ALWAYS forbidden.
-/// - `id-token: write` and `dart pub publish` are allowed ONLY inside
-///   the approved publish workflow jobs: `publish.yaml::publish_patch_minor`
-///   and `publish.yaml::publish_major`.
+/// - `id-token: write` and `dart pub publish --force` are allowed ONLY inside
+///   the approved publish workflow job: `publish.yaml::publish_package`.
 /// - All other workflows/jobs deny OIDC, publish commands, and credentials.
 class PublishSafety {
-  /// Rule name: no `dart pub publish --force`.
+  /// Rule name: no `dart pub publish --force` outside approved publish jobs.
   static const String noForcePublishRule = 'no-force-publish';
 
   /// Rule name: no `melos publish --no-dry-run`.
@@ -56,8 +55,7 @@ class PublishSafety {
 
   /// Approved workflow + job pairs that may use OIDC and publish commands.
   static const List<String> _allowedOidcJobs = [
-    'publish.yaml::publish_patch_minor',
-    'publish.yaml::publish_major',
+    'publish.yaml::publish_package',
   ];
 
   /// Asserts that [content] does not contain forbidden publish patterns.
@@ -76,7 +74,8 @@ class PublishSafety {
     final violations = <SafetyViolation>[];
     final lines = content.split('\n');
 
-    final isApprovedPublishJob = workflow != null &&
+    final isApprovedPublishJob =
+        workflow != null &&
         job != null &&
         _allowedOidcJobs.contains('$workflow::$job');
 
@@ -84,51 +83,63 @@ class PublishSafety {
       final line = lines[i];
       final lineNum = i + 1;
 
-      // Check for `dart pub publish --force` — always forbidden.
-      if (_containsForcePublish(line)) {
-        violations.add(SafetyViolation(
-          rule: noForcePublishRule,
-          line: lineNum,
-          matchedText: line.trim(),
-        ));
+      // Check for `dart pub publish --force` — allowed only in approved
+      // publish jobs because pub.dev trusted publishing requires it in CI to
+      // skip the interactive confirmation prompt.
+      if (_containsForcePublish(line) && !isApprovedPublishJob) {
+        violations.add(
+          SafetyViolation(
+            rule: noForcePublishRule,
+            line: lineNum,
+            matchedText: line.trim(),
+          ),
+        );
       }
 
       // Check for `melos publish --no-dry-run` — always forbidden.
       if (_containsMelosNoDryRun(line)) {
-        violations.add(SafetyViolation(
-          rule: noMelosNoDryRunRule,
-          line: lineNum,
-          matchedText: line.trim(),
-        ));
+        violations.add(
+          SafetyViolation(
+            rule: noMelosNoDryRunRule,
+            line: lineNum,
+            matchedText: line.trim(),
+          ),
+        );
       }
 
       // Check for plain `dart pub publish` — allowed only in approved
       // publish jobs. This catches `run: dart pub publish` without
       // --dry-run or --force in non-approved workflows/jobs.
       if (_containsPlainPublish(line) && !isApprovedPublishJob) {
-        violations.add(SafetyViolation(
-          rule: noPlainPublishRule,
-          line: lineNum,
-          matchedText: line.trim(),
-        ));
+        violations.add(
+          SafetyViolation(
+            rule: noPlainPublishRule,
+            line: lineNum,
+            matchedText: line.trim(),
+          ),
+        );
       }
 
       // Check for OIDC id-token permission — allowed only in approved jobs.
       if (_containsOidcPermission(line) && !isApprovedPublishJob) {
-        violations.add(SafetyViolation(
-          rule: noOidcRule,
-          line: lineNum,
-          matchedText: line.trim(),
-        ));
+        violations.add(
+          SafetyViolation(
+            rule: noOidcRule,
+            line: lineNum,
+            matchedText: line.trim(),
+          ),
+        );
       }
 
       // Check for publish token env vars — always forbidden.
       if (_containsTokenEnvVar(line)) {
-        violations.add(SafetyViolation(
-          rule: noTokenEnvRule,
-          line: lineNum,
-          matchedText: line.trim(),
-        ));
+        violations.add(
+          SafetyViolation(
+            rule: noTokenEnvRule,
+            line: lineNum,
+            matchedText: line.trim(),
+          ),
+        );
       }
     }
 
@@ -175,8 +186,7 @@ class PublishSafety {
 
   /// Checks for OIDC `id-token: write` permission.
   static bool _containsOidcPermission(String line) {
-    return line.contains('id-token: write') ||
-        line.contains('id-token:write');
+    return line.contains('id-token: write') || line.contains('id-token:write');
   }
 
   /// Checks for publish token environment variable references.

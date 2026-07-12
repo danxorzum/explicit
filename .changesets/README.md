@@ -64,7 +64,7 @@ This creates a boilerplate file in `.changesets/`.
 |---|---|
 | `patch` | Bug fixes, internal refactors with no API change |
 | `minor` | New backwards-compatible API additions |
-| `major` | Breaking API changes (requires protected Environment approval) |
+| `major` | Breaking API changes |
 
 ## Release flow
 
@@ -72,4 +72,5 @@ This creates a boilerplate file in `.changesets/`.
 2. CI verifies publishable changes have matching changesets.
 3. After merge, the release workflow converts changesets into a version PR.
 4. Version PR updates `pubspec.yaml` versions and `CHANGELOG.md` entries.
-5. Merging the version PR prepares for intentional tag-triggered publishing.
+5. After the version PR is merged and CI is green, the maintainer manually creates and pushes release tags.
+6. Release tags trigger OIDC publishing through `publish.yaml`. If both packages release, publish `explicit_outcome` first and wait until it is visible on pub.dev before publishing `explicit`.

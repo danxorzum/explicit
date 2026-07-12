@@ -3,8 +3,8 @@
 // Usage:
 //   dart run tool/release_changeset.dart init --package=<name> --bump=<level> --summary="<text>"
 //   dart run tool/release_changeset.dart check --changed-files=<files> [--base=<sha> --head=<sha>]
-//   dart run tool/release_changeset.dart plan --format=markdown|json
-//   dart run tool/release_changeset.dart version-pr
+//   dart run tool/release_changeset.dart plan --base=<sha> --head=<sha> [--format=markdown|json]
+//   dart run tool/release_changeset.dart version-pr --base=<sha> --head=<sha>
 //   dart run tool/release_changeset.dart validate-release --tag=<tag>
 //
 // This CLI is the release intent boundary. Candidates come ONLY from
@@ -59,7 +59,7 @@ void _printUsage() {
     ..writeln('  version-pr Apply version/changelog edits')
     ..writeln(
       '  validate-release Validate a release tag against '
-      'pubspec/changelog/provenance (slice three)',
+      'pubspec/changelog/provenance',
     )
     ..writeln()
     ..writeln('Options for init:')
@@ -79,6 +79,8 @@ void _printUsage() {
     ..writeln()
     ..writeln('Options for plan:')
     ..writeln('  --format=markdown|json   Output format (default: markdown)')
+    ..writeln('  --changed-files=<files>  Comma-separated changed file paths')
+    ..writeln('  --base=<sha> --head=<sha>  Git diff range for impact analysis')
     ..writeln(
       '  --changesets-dir=<path>  Changesets directory (default: .changesets)',
     )
@@ -91,6 +93,8 @@ void _printUsage() {
     ..writeln(
       '  --workspace-root=<path>  Workspace root (default: current directory)',
     )
+    ..writeln('  --changed-files=<files>  Comma-separated changed file paths')
+    ..writeln('  --base=<sha> --head=<sha>  Git diff range for impact analysis')
     ..writeln()
     ..writeln('Options for validate-release:')
     ..writeln('  --tag=<tag>              Release tag to validate (required)')
@@ -181,16 +185,17 @@ Future<void> _handleCheck(List<String> args) async {
       ? _defaultChangesetsDir
       : _extractArg(args, 'changesets-dir');
 
-  // Get changed files
-  List<String> changedFiles;
+  // Get changed files with diff content for content-aware analysis.
+  List<ChangedFile> changedFiles;
   if (changedFilesArg.isNotEmpty) {
     changedFiles = changedFilesArg
         .split(',')
         .map((f) => f.trim())
         .where((f) => f.isNotEmpty)
+        .map((f) => ChangedFile(path: f))
         .toList();
   } else if (base.isNotEmpty && head.isNotEmpty) {
-    changedFiles = await _getGitDiffFiles(base, head);
+    changedFiles = await _getGitDiffChangedFiles(base, head);
   } else {
     stderr.writeln(
       'ERROR: provide --changed-files=<files> or --base=<sha> --head=<sha>.',
@@ -201,37 +206,71 @@ Future<void> _handleCheck(List<String> args) async {
   // Parse changesets
   final changesets = _loadChangesets(changesetsDir);
 
-  // Run check
-  final result = ReleasePlanner.check(
+  // Reconcile real impact with changeset intent.
+  final reconciliation = ReleaseReconciler.reconcile(
     changedFiles: changedFiles,
     changesets: changesets,
   );
 
-  if (result.passed) {
-    final publishablePkgs = PublishableClassifier.findPublishablePackages(
-      changedFiles,
-    );
-    final pkgList = publishablePkgs.isEmpty
-        ? 'none'
-        : publishablePkgs.join(', ');
-    stdout
-      ..writeln('=== Changeset Release Intent Check ===')
-      ..writeln()
-      ..writeln('PASS: All publishable changes have matching changesets.')
-      ..writeln()
-      ..writeln('Changed files: ${changedFiles.length}')
-      ..writeln('Publishable packages: $pkgList')
-      ..writeln('Changesets found: ${changesets.length}');
-    exit(0);
-  } else {
+  // Fail on real impact without changeset (missingIntentFailures).
+  if (reconciliation.hasFailures) {
     stderr
-      ..writeln('=== Changeset Release Intent Check ===')
+      ..writeln('=== Release Intent Check ===')
       ..writeln()
-      ..writeln('FAIL: Missing changesets for publishable changes.')
-      ..writeln()
-      ..writeln(result.remediation);
+      ..writeln('FAIL: Real package impact without matching changeset.')
+      ..writeln();
+    for (final failure in reconciliation.missingIntentFailures) {
+      stderr
+        ..writeln(failure.remediation)
+        ..writeln();
+    }
     exit(1);
   }
+
+  // Surface unused intent warnings (changeset without real impact).
+  final changedFilePaths = changedFiles.map((f) => f.path).toList();
+  final publishablePkgs = PublishableClassifier.findPublishablePackages(
+    changedFilePaths,
+  );
+
+  if (reconciliation.unusedIntentWarnings.isNotEmpty) {
+    stdout
+      ..writeln('=== Release Intent Check ===')
+      ..writeln()
+      ..writeln('PASS: No missing changesets for real impact.')
+      ..writeln();
+    for (final warning in reconciliation.unusedIntentWarnings) {
+      stdout.writeln('WARNING: ${warning.reason}');
+    }
+    stdout
+      ..writeln()
+      ..writeln('Changed files: ${changedFiles.length}')
+      ..writeln(
+        'Publishable packages: '
+        '${publishablePkgs.isEmpty ? "none" : publishablePkgs.join(", ")}',
+      )
+      ..writeln('Changesets found: ${changesets.length}')
+      ..writeln(
+        'Release candidates: '
+        '${reconciliation.releaseCandidates.length}',
+      );
+    exit(0);
+  }
+
+  // All good — no failures, no warnings.
+  stdout
+    ..writeln('=== Release Intent Check ===')
+    ..writeln()
+    ..writeln('PASS: All publishable changes have matching changesets.')
+    ..writeln()
+    ..writeln('Changed files: ${changedFiles.length}')
+    ..writeln(
+      'Publishable packages: '
+      '${publishablePkgs.isEmpty ? "none" : publishablePkgs.join(", ")}',
+    )
+    ..writeln('Changesets found: ${changesets.length}')
+    ..writeln('Release candidates: ${reconciliation.releaseCandidates.length}');
+  exit(0);
 }
 
 Future<void> _handlePlan(List<String> args) async {
@@ -241,6 +280,9 @@ Future<void> _handlePlan(List<String> args) async {
   final changesetsDir = _extractArg(args, 'changesets-dir').isEmpty
       ? _defaultChangesetsDir
       : _extractArg(args, 'changesets-dir');
+  final changedFilesArg = _extractArg(args, 'changed-files');
+  final base = _extractArg(args, 'base');
+  final head = _extractArg(args, 'head');
 
   if (format != 'markdown' && format != 'json') {
     stderr.writeln('ERROR: --format must be markdown or json.');
@@ -248,7 +290,53 @@ Future<void> _handlePlan(List<String> args) async {
   }
 
   final changesets = _loadChangesets(changesetsDir);
-  final plan = ReleasePlanner.plan(changesets);
+
+  if (changedFilesArg.isEmpty && (base.isEmpty || head.isEmpty)) {
+    stderr.writeln(
+      'ERROR: plan requires diff context via --changed-files=<files> '
+      'or --base=<sha> --head=<sha>. Changesets alone are intent, not '
+      'impact proof.',
+    );
+    exit(64);
+  }
+
+  final ReleasePlan plan;
+  final List<UnusedIntentWarning> unusedWarnings;
+
+  List<ChangedFile> changedFiles;
+  if (changedFilesArg.isNotEmpty) {
+    changedFiles = changedFilesArg
+        .split(',')
+        .map((f) => f.trim())
+        .where((f) => f.isNotEmpty)
+        .map((f) => ChangedFile(path: f))
+        .toList();
+  } else {
+    changedFiles = await _getGitDiffChangedFiles(base, head);
+  }
+
+  final reconciliation = ReleaseReconciler.reconcile(
+    changedFiles: changedFiles,
+    changesets: changesets,
+  );
+
+  if (reconciliation.hasFailures) {
+    stderr
+      ..writeln('=== Release Plan ===')
+      ..writeln()
+      ..writeln('FAIL: Real package impact without matching changeset.')
+      ..writeln('Refusing to render a partial release plan.')
+      ..writeln();
+    for (final failure in reconciliation.missingIntentFailures) {
+      stderr
+        ..writeln(failure.remediation)
+        ..writeln();
+    }
+    exit(1);
+  }
+
+  plan = _buildPlanFromCandidates(reconciliation.releaseCandidates);
+  unusedWarnings = reconciliation.unusedIntentWarnings;
 
   if (format == 'json') {
     stdout.writeln(plan.renderJson());
@@ -258,8 +346,14 @@ Future<void> _handlePlan(List<String> args) async {
       ..writeln()
       ..writeln('Changesets loaded: ${changesets.length}')
       ..writeln('Candidates: ${plan.candidates.length}')
-      ..writeln()
-      ..writeln(plan.renderMarkdown());
+      ..writeln();
+
+    for (final warning in unusedWarnings) {
+      stdout.writeln('WARNING: ${warning.reason}');
+    }
+    if (unusedWarnings.isNotEmpty) stdout.writeln();
+
+    stdout.writeln(plan.renderMarkdown());
   }
 }
 
@@ -270,20 +364,77 @@ Future<void> _handleVersionPr(List<String> args) async {
   final workspaceRoot = _extractArg(args, 'workspace-root').isEmpty
       ? Directory.current.path
       : _extractArg(args, 'workspace-root');
+  final changedFilesArg = _extractArg(args, 'changed-files');
+  final base = _extractArg(args, 'base');
+  final head = _extractArg(args, 'head');
 
   final changesets = _loadChangesets(changesetsDir);
-  final plan = ReleasePlanner.plan(changesets);
+
+  if (changedFilesArg.isEmpty && (base.isEmpty || head.isEmpty)) {
+    stderr.writeln(
+      'ERROR: version-pr requires diff context via --changed-files=<files> '
+      'or --base=<sha> --head=<sha>. Refusing to write weak provenance '
+      'from changeset intent alone.',
+    );
+    exit(64);
+  }
+
+  final ReleasePlan plan;
+  final List<UnusedIntentWarning> unusedWarnings;
+
+  List<ChangedFile> changedFiles;
+  if (changedFilesArg.isNotEmpty) {
+    changedFiles = changedFilesArg
+        .split(',')
+        .map((f) => f.trim())
+        .where((f) => f.isNotEmpty)
+        .map((f) => ChangedFile(path: f))
+        .toList();
+  } else {
+    changedFiles = await _getGitDiffChangedFiles(base, head);
+  }
+
+  final reconciliation = ReleaseReconciler.reconcile(
+    changedFiles: changedFiles,
+    changesets: changesets,
+  );
+
+  if (reconciliation.hasFailures) {
+    stderr
+      ..writeln('=== Version PR ===')
+      ..writeln()
+      ..writeln('FAIL: Real package impact without matching changeset.')
+      ..writeln('Refusing to write a partial release/version PR.')
+      ..writeln();
+    for (final failure in reconciliation.missingIntentFailures) {
+      stderr
+        ..writeln(failure.remediation)
+        ..writeln();
+    }
+    exit(1);
+  }
+
+  plan = _buildPlanFromCandidates(reconciliation.releaseCandidates);
+  unusedWarnings = reconciliation.unusedIntentWarnings;
 
   if (plan.candidates.isEmpty) {
+    final reason = changesets.isEmpty
+        ? 'no changesets found'
+        : 'changeset intent has no real package impact';
     stdout
       ..writeln('=== Version PR ===')
       ..writeln()
-      ..writeln('No release candidates — no changesets found.')
-      ..writeln()
-      ..writeln(
-        'Publish handoff: tag-triggered OIDC publishing is available '
-        'via the publish workflow (publish.yaml).',
-      );
+      ..writeln('No release candidates — $reason.')
+      ..writeln();
+
+    for (final warning in unusedWarnings) {
+      stdout.writeln('WARNING: ${warning.reason}');
+    }
+
+    stdout.writeln(
+      'No release tags will be created until a version PR with validated '
+      'release candidates merges.',
+    );
     return;
   }
 
@@ -293,6 +444,11 @@ Future<void> _handleVersionPr(List<String> args) async {
     ..writeln('Applying version edits to: $workspaceRoot')
     ..writeln('Candidates: ${plan.candidates.length}')
     ..writeln();
+
+  for (final warning in unusedWarnings) {
+    stdout.writeln('WARNING: ${warning.reason}');
+  }
+  if (unusedWarnings.isNotEmpty) stdout.writeln();
 
   final edits = VersionEditor.applyVersionEdits(
     plan,
@@ -422,6 +578,27 @@ Future<void> _handleValidateRelease(List<String> args) async {
   }
 }
 
+/// Builds a [ReleasePlan] from reconciled release candidates.
+///
+/// Computes dependency propagation from the candidate list.
+ReleasePlan _buildPlanFromCandidates(List<ReleaseCandidate> candidates) {
+  final dependencyUpdates = <DependencyUpdate>[];
+  final candidateNames = candidates.map((c) => c.packageName).toSet();
+  if (candidateNames.contains('explicit_outcome') &&
+      candidateNames.contains('explicit')) {
+    dependencyUpdates.add(
+      const DependencyUpdate(
+        packageName: 'explicit',
+        dependencyName: 'explicit_outcome',
+      ),
+    );
+  }
+  return ReleasePlan(
+    candidates: candidates,
+    dependencyUpdates: dependencyUpdates,
+  );
+}
+
 List<Changeset> _loadChangesets(String dir) {
   final changesetsDir = Directory(dir);
   if (!changesetsDir.existsSync()) {
@@ -468,12 +645,16 @@ bool _isChangesetTemplateFile(String path) {
   return fileName == 'readme.md';
 }
 
-Future<List<String>> _getGitDiffFiles(String base, String head) async {
-  final result = await Process.run(
+Future<List<ChangedFile>> _getGitDiffChangedFiles(
+  String base,
+  String head,
+) async {
+  // Step 1: Get the list of changed file names.
+  final nameResult = await Process.run(
     'git',
     ['diff', '--name-only', '$base...$head'],
   );
-  if (result.exitCode != 0) {
+  if (nameResult.exitCode != 0) {
     stderr
       ..writeln('ERROR: git diff failed for range $base...$head.')
       ..writeln()
@@ -484,12 +665,32 @@ Future<List<String>> _getGitDiffFiles(String base, String head) async {
       ..writeln('ensure CI uses actions/checkout with fetch-depth: 0, or pass')
       ..writeln('--changed-files=<comma-separated paths> explicitly.')
       ..writeln()
-      ..writeln('git stderr: ${(result.stderr as String).trim()}');
+      ..writeln('git stderr: ${(nameResult.stderr as String).trim()}');
     exit(69); // EX_UNAVAILABLE
   }
-  final output = (result.stdout as String).trim();
-  if (output.isEmpty) return [];
-  return output.split('\n');
+  final nameOutput = (nameResult.stdout as String).trim();
+  if (nameOutput.isEmpty) return [];
+  final fileNames = nameOutput.split('\n');
+
+  // Step 2: Collect unified diff content per file for content-aware analysis.
+  final changedFiles = <ChangedFile>[];
+  for (final fileName in fileNames) {
+    final diffResult = await Process.run(
+      'git',
+      ['diff', '$base...$head', '--', fileName],
+    );
+    final diffContent = diffResult.exitCode == 0
+        ? (diffResult.stdout as String).trim()
+        : null;
+    changedFiles.add(
+      ChangedFile(
+        path: fileName,
+        diffContent: diffContent?.isNotEmpty == true ? diffContent : null,
+      ),
+    );
+  }
+
+  return changedFiles;
 }
 
 /// Fetches pub.dev package metadata via the pub.dev API.
