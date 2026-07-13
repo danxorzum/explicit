@@ -5,10 +5,8 @@ import '../src/affected_detector.dart';
 void main() {
   group('AffectedDetector', () {
     group('detectAffectedPackages', () {
-      test(
-        'returns explicit_outcome and explicit '
-        'when explicit_outcome files change',
-        () {
+      test('returns explicit_outcome and explicit '
+          'when explicit_outcome files change', () {
         final changedFiles = [
           'packages/explicit_outcome/lib/src/option/opt.dart',
         ];
@@ -17,9 +15,7 @@ void main() {
       });
 
       test('returns only explicit when only explicit files change', () {
-        final changedFiles = [
-          'packages/explicit/lib/src/some_file.dart',
-        ];
+        final changedFiles = ['packages/explicit/lib/src/some_file.dart'];
         final affected = AffectedDetector.detectAffectedPackages(changedFiles);
         expect(affected, contains('explicit'));
         expect(affected, isNot(contains('explicit_outcome')));

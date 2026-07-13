@@ -152,14 +152,13 @@ Future<List<String>> _getChangedFiles(QualityGateConfig config) async {
 
 /// Gets files changed between two git commits.
 Future<List<String>> _getGitDiffFiles(String base, String head) async {
-  final result = await Process.run(
-    'git',
-    ['diff', '--name-only', '$base...$head'],
-  );
+  final result = await Process.run('git', [
+    'diff',
+    '--name-only',
+    '$base...$head',
+  ]);
   if (result.exitCode != 0) {
-    stderr.writeln(
-      'Warning: git diff failed, falling back to validate-all',
-    );
+    stderr.writeln('Warning: git diff failed, falling back to validate-all');
     return ['pubspec.yaml']; // triggers validate-all
   }
   final output = (result.stdout as String).trim();
@@ -170,10 +169,11 @@ Future<List<String>> _getGitDiffFiles(String base, String head) async {
 /// Gets files changed for pre-push (HEAD vs remote tracking branch).
 Future<List<String>> _getPrePushFiles() async {
   // Get the current branch name
-  final branchResult = await Process.run(
-    'git',
-    ['rev-parse', '--abbrev-ref', 'HEAD'],
-  );
+  final branchResult = await Process.run('git', [
+    'rev-parse',
+    '--abbrev-ref',
+    'HEAD',
+  ]);
   if (branchResult.exitCode != 0) {
     stderr.writeln(
       'Warning: could not detect branch, '
@@ -186,15 +186,14 @@ Future<List<String>> _getPrePushFiles() async {
   final remote = 'origin/$branch';
 
   // Check if remote tracking branch exists
-  final checkResult = await Process.run(
-    'git',
-    ['rev-parse', '--verify', remote],
-  );
+  final checkResult = await Process.run('git', [
+    'rev-parse',
+    '--verify',
+    remote,
+  ]);
   if (checkResult.exitCode != 0) {
     // No remote tracking branch — validate all
-    stdout.writeln(
-      'No remote tracking branch found. Validating all packages.',
-    );
+    stdout.writeln('No remote tracking branch found. Validating all packages.');
     return ['pubspec.yaml']; // triggers validate-all
   }
 

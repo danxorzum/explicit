@@ -301,10 +301,7 @@ class ReleasePlan {
           .toList(),
       'dependencyUpdates': dependencyUpdates
           .map(
-            (d) => {
-              'package': d.packageName,
-              'dependency': d.dependencyName,
-            },
+            (d) => {'package': d.packageName, 'dependency': d.dependencyName},
           )
           .toList(),
       'publishFlow':
@@ -458,15 +455,11 @@ class ReleaseProvenance {
     try {
       decoded = jsonDecode(jsonStr);
     } on FormatException {
-      throw const FormatException(
-        'Provenance manifest is not valid JSON.',
-      );
+      throw const FormatException('Provenance manifest is not valid JSON.');
     }
 
     if (decoded is! Map<String, dynamic>) {
-      throw const FormatException(
-        'Provenance manifest must be a JSON object.',
-      );
+      throw const FormatException('Provenance manifest must be a JSON object.');
     }
 
     final pkg = decoded['package'] as String?;
@@ -609,10 +602,7 @@ class TagInfo {
 /// ambiguous formats.
 class TagParser {
   /// Known publishable package names.
-  static const List<String> _allowedPackages = [
-    'explicit_outcome',
-    'explicit',
-  ];
+  static const List<String> _allowedPackages = ['explicit_outcome', 'explicit'];
 
   /// Parses a release tag string into a [TagInfo].
   ///
@@ -749,9 +739,7 @@ class ReleaseValidator {
     // Read pubspec version.
     final pubspecVersion = _readVersionFromPubspec(pubspecContent);
     if (pubspecVersion == null) {
-      errors.add(
-        'Pubspec version not found for ${tagInfo.packageName}.',
-      );
+      errors.add('Pubspec version not found for ${tagInfo.packageName}.');
     } else if (pubspecVersion != tagInfo.version) {
       errors.add(
         'Version mismatch: tag says ${tagInfo.version}, '
@@ -882,10 +870,7 @@ class ReleaseValidator {
         tagVersion: tagInfo.version,
         errors: errors,
       );
-      _validateChangesetProof(
-        provenance: provenance,
-        errors: errors,
-      );
+      _validateChangesetProof(provenance: provenance, errors: errors);
 
       // Extract provenance bump for release metadata.
       provenanceBump = provenance.bump;
@@ -1108,10 +1093,7 @@ class ReleaseValidator {
 /// Injectable for testing — production code fetches from pub.dev API,
 /// tests inject deterministic fixtures.
 class PubDevMetadata {
-  const PubDevMetadata({
-    required this.packageName,
-    required this.versions,
-  });
+  const PubDevMetadata({required this.packageName, required this.versions});
 
   /// Package name on pub.dev.
   final String packageName;
@@ -1122,10 +1104,7 @@ class PubDevMetadata {
 
 /// Result of a dependency preflight check.
 class PreflightResult {
-  const PreflightResult({
-    required this.isSatisfied,
-    required this.errors,
-  });
+  const PreflightResult({required this.isSatisfied, required this.errors});
 
   /// Whether the dependency constraint is satisfied.
   final bool isSatisfied;
@@ -1350,10 +1329,7 @@ class DartDiffAnalyzer {
           continue;
         } else {
           // Block comment continues to next lines.
-          return _StripResult(
-            text: buffer.toString(),
-            inBlockComment: true,
-          );
+          return _StripResult(text: buffer.toString(), inBlockComment: true);
         }
       }
 
@@ -1368,10 +1344,7 @@ class DartDiffAnalyzer {
       i++;
     }
 
-    return _StripResult(
-      text: buffer.toString(),
-      inBlockComment: false,
-    );
+    return _StripResult(text: buffer.toString(), inBlockComment: false);
   }
 }
 
@@ -1496,9 +1469,7 @@ class ImpactClassifier {
     // lib/** files — content-aware analysis if diff available.
     if (relative.startsWith('lib/')) {
       if (file.diffContent != null) {
-        final hasReal = DartDiffAnalyzer.hasRealCodeChanges(
-          file.diffContent!,
-        );
+        final hasReal = DartDiffAnalyzer.hasRealCodeChanges(file.diffContent!);
         if (!hasReal) {
           // Determine if it's comment-only or whitespace-only.
           final category = _classifyNonRealDiff(file.diffContent!);
@@ -1584,10 +1555,7 @@ class MissingIntentFailure {
 
 /// A changeset intent that has no corresponding real package impact.
 class UnusedIntentWarning {
-  const UnusedIntentWarning({
-    required this.packageName,
-    required this.reason,
-  });
+  const UnusedIntentWarning({required this.packageName, required this.reason});
 
   /// Package name with unused intent.
   final String packageName;
@@ -1773,10 +1741,7 @@ class DependencyPreflight {
           'Failed to fetch pub.dev metadata for '
           'explicit_outcome: $e. Failing closed — cannot '
           'verify dependency availability.';
-      return PreflightResult(
-        isSatisfied: false,
-        errors: [msg],
-      );
+      return PreflightResult(isSatisfied: false, errors: [msg]);
     }
 
     // Check if the required version exists and satisfies the constraint.
@@ -1796,10 +1761,7 @@ class DependencyPreflight {
             'No published version of explicit_outcome '
             'satisfies constraint ^$requiredVersion. '
             'explicit_outcome must be published before explicit.';
-        return PreflightResult(
-          isSatisfied: false,
-          errors: [msg],
-        );
+        return PreflightResult(isSatisfied: false, errors: [msg]);
       }
     }
 

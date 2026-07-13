@@ -1,9 +1,6 @@
 /// Result of parsing an lcov.info file.
 class CoverageResult {
-  const CoverageResult({
-    required this.linesFound,
-    required this.linesHit,
-  });
+  const CoverageResult({required this.linesFound, required this.linesHit});
 
   /// Total lines of instrumentable code found.
   final int linesFound;

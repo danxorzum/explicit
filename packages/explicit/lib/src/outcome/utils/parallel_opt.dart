@@ -96,12 +96,8 @@ final class ParallelOpt3<A extends Object, B extends Object, C extends Object> {
 /// Exceptions thrown by recipes propagate; this class does not catch, retry,
 /// or convert thrown errors.
 @experimental
-final class ParallelOpt4<
-  A extends Object,
-  B extends Object,
-  C extends Object,
-  D extends Object
-> {
+final class ParallelOpt4<A extends Object, B extends Object, C extends Object,
+    D extends Object> {
   /// Creates a parallel combinator for four [AsyncOpt] recipes.
   const ParallelOpt4(this.a, this.b, this.c, this.d);
 
@@ -151,13 +147,8 @@ final class ParallelOpt4<
 /// Exceptions thrown by recipes propagate; this class does not catch, retry,
 /// or convert thrown errors.
 @experimental
-final class ParallelOpt5<
-  A extends Object,
-  B extends Object,
-  C extends Object,
-  D extends Object,
-  E extends Object
-> {
+final class ParallelOpt5<A extends Object, B extends Object, C extends Object,
+    D extends Object, E extends Object> {
   /// Creates a parallel combinator for five [AsyncOpt] recipes.
   const ParallelOpt5(this.a, this.b, this.c, this.d, this.e);
 

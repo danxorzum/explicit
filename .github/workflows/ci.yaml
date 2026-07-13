@@ -7,7 +7,7 @@ concurrency:
 on:
   push:
     branches:
-      - main
+      - '**'
   pull_request:
     branches:
       - main
@@ -17,8 +17,9 @@ permissions:
 
 jobs:
   # Job 1: Quality gate (format → analyze → test/coverage, fail-fast)
+  # Stable repo-tooling lane: uses Dart 3.12 for workspace, Melos, tool tests.
   quality_gate:
-    name: Quality gate
+    name: Quality gate (stable)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -48,11 +49,27 @@ jobs:
       - name: Run tool tests
         run: dart test tool/test/
 
-  # Job 2: Changeset release intent (PRs only)
+  # Job 2: Dart 3.6 package compatibility lane (blocking).
+  # Proves the declared SDK floor (>=3.6.0 <4.0.0) by running the
+  # path-consumer fixture outside the workspace.
+  dart36_package_lane:
+    name: "Dart 3.6 package compatibility"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: "3.6.2"
+
+      - name: Run Dart 3.6 compatibility fixture
+        run: dart tool/dart36_compatibility.dart
+
+  # Job 3: Changeset release intent (PRs only)
   # Verifies that publishable package changes have matching changesets.
   # Fails with remediation message if changesets are missing.
   changeset_release_intent:
-    name: "Changeset release intent"
+    name: "Changeset release intent (stable)"
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -75,7 +92,7 @@ jobs:
             --base=${{ github.event.pull_request.base.sha }} \
             --head=${{ github.event.pull_request.head.sha }}
 
-  # Job 3: Semantic PR title (independent, metadata only)
+  # Job 4: Semantic PR title (independent, metadata only)
   semantic_pull_request:
     name: Semantic PR title
     if: github.event_name == 'pull_request'

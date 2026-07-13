@@ -90,14 +90,13 @@ void main() {
       'is lazy and transforms present values in declaration order',
       () async {
         final events = <String>[];
-        final mapped =
-            AsyncOpt<int>(() async {
-              events.add('operation');
-              return const Val(20);
-            }).map((value) {
-              events.add('map');
-              return value + 22;
-            });
+        final mapped = AsyncOpt<int>(() async {
+          events.add('operation');
+          return const Val(20);
+        }).map((value) {
+          events.add('map');
+          return value + 22;
+        });
 
         expect(events, isEmpty);
 
@@ -110,14 +109,13 @@ void main() {
 
     test('preserves nil and propagates transform exceptions', () async {
       final nilEvents = <String>[];
-      final absent =
-          AsyncOpt<int>(() async {
-            nilEvents.add('operation');
-            return const Nil<int>();
-          }).map((value) {
-            nilEvents.add('unexpected:$value');
-            return value + 1;
-          });
+      final absent = AsyncOpt<int>(() async {
+        nilEvents.add('operation');
+        return const Nil<int>();
+      }).map((value) {
+        nilEvents.add('unexpected:$value');
+        return value + 1;
+      });
 
       expect(await absent.run(), const Nil<int>());
       expect(nilEvents, ['operation']);
@@ -134,17 +132,16 @@ void main() {
   group('AsyncOpt.next', () {
     test('chains present values lazily in declaration order', () async {
       final events = <String>[];
-      final chained =
-          AsyncOpt<int>(() async {
-            events.add('first');
-            return const Val(20);
-          }).next((value) {
-            events.add('build second:$value');
-            return AsyncOpt<int>(() async {
-              events.add('second');
-              return Val(value + 22);
-            });
-          });
+      final chained = AsyncOpt<int>(() async {
+        events.add('first');
+        return const Val(20);
+      }).next((value) {
+        events.add('build second:$value');
+        return AsyncOpt<int>(() async {
+          events.add('second');
+          return Val(value + 22);
+        });
+      });
 
       expect(events, isEmpty);
 
@@ -156,14 +153,13 @@ void main() {
 
     test('short-circuits nil and propagates callback exceptions', () async {
       final events = <String>[];
-      final absent =
-          AsyncOpt<int>(() async {
-            events.add('first');
-            return const Nil<int>();
-          }).next((value) {
-            events.add('unexpected:$value');
-            return AsyncOpt<int>(() async => const Val(0));
-          });
+      final absent = AsyncOpt<int>(() async {
+        events.add('first');
+        return const Nil<int>();
+      }).next((value) {
+        events.add('unexpected:$value');
+        return AsyncOpt<int>(() async => const Val(0));
+      });
 
       expect(await absent.run(), const Nil<int>());
       expect(events, ['first']);
@@ -180,14 +176,13 @@ void main() {
   group('AsyncOpt.or', () {
     test('returns present values without evaluating fallback', () async {
       final events = <String>[];
-      final option =
-          AsyncOpt<int>(() async {
-            events.add('operation');
-            return const Val(42);
-          }).or(() {
-            events.add('unexpected');
-            return AsyncOpt<int>(() async => const Val(0));
-          });
+      final option = AsyncOpt<int>(() async {
+        events.add('operation');
+        return const Val(42);
+      }).or(() {
+        events.add('unexpected');
+        return AsyncOpt<int>(() async => const Val(0));
+      });
 
       final result = await option.run();
 
@@ -199,17 +194,16 @@ void main() {
       'evaluates fallback for nil and propagates fallback exceptions',
       () async {
         final events = <String>[];
-        final option =
-            AsyncOpt<int>(() async {
-              events.add('operation');
-              return const Nil<int>();
-            }).or(() {
-              events.add('build fallback');
-              return AsyncOpt<int>(() async {
-                events.add('fallback');
-                return const Val(7);
-              });
-            });
+        final option = AsyncOpt<int>(() async {
+          events.add('operation');
+          return const Nil<int>();
+        }).or(() {
+          events.add('build fallback');
+          return AsyncOpt<int>(() async {
+            events.add('fallback');
+            return const Val(7);
+          });
+        });
 
         expect(await option.run(), const Val(7));
         expect(events, ['operation', 'build fallback', 'fallback']);

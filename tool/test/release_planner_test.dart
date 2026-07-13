@@ -51,10 +51,7 @@ explicit: patch
         'explicit_outcome': BumpLevel.minor,
         'explicit': BumpLevel.patch,
       });
-      expect(
-        changeset.notes,
-        contains('Add typed outcome API improvements.'),
-      );
+      expect(changeset.notes, contains('Add typed outcome API improvements.'));
     });
 
     test('parses changeset with single package', () {
@@ -67,10 +64,7 @@ explicit_outcome: patch
 ''';
       final changeset = Changeset.parse(content);
       expect(changeset.bumps, {'explicit_outcome': BumpLevel.patch});
-      expect(
-        changeset.notes,
-        contains('Fix edge case in outcome mapping.'),
-      );
+      expect(changeset.notes, contains('Fix edge case in outcome mapping.'));
     });
 
     test('throws on missing front matter', () {
@@ -168,10 +162,7 @@ explicit: minor
     });
 
     test('docs are not publishable', () {
-      expect(
-        PublishableClassifier.isPublishable('docs/setup.md'),
-        isFalse,
-      );
+      expect(PublishableClassifier.isPublishable('docs/setup.md'), isFalse);
       expect(
         PublishableClassifier.isPublishable('packages/explicit/README.md'),
         isFalse,
@@ -193,10 +184,7 @@ explicit: minor
     });
 
     test('root config files are not publishable', () {
-      expect(
-        PublishableClassifier.isPublishable('pubspec.yaml'),
-        isFalse,
-      );
+      expect(PublishableClassifier.isPublishable('pubspec.yaml'), isFalse);
       expect(
         PublishableClassifier.isPublishable('analysis_options.yaml'),
         isFalse,
@@ -218,9 +206,7 @@ explicit: minor
         'explicit_outcome',
       );
       expect(
-        PublishableClassifier.packageName(
-          'packages/explicit/lib/main.dart',
-        ),
+        PublishableClassifier.packageName('packages/explicit/lib/main.dart'),
         'explicit',
       );
     });
@@ -319,28 +305,22 @@ explicit: minor
         final plan = ReleasePlanner.plan(changesets);
         expect(plan.dependencyUpdates, hasLength(1));
         expect(plan.dependencyUpdates.first.packageName, 'explicit');
-        expect(
-          plan.dependencyUpdates.first.dependencyName,
-          'explicit_outcome',
-        );
+        expect(plan.dependencyUpdates.first.dependencyName, 'explicit_outcome');
       });
 
-      test(
-        'dependency propagation: only explicit_outcome selected '
-        'does not release explicit',
-        () {
-          final changesets = [
-            const Changeset(
-              bumps: {'explicit_outcome': BumpLevel.minor},
-              notes: '- Only outcome.',
-            ),
-          ];
-          final plan = ReleasePlanner.plan(changesets);
-          expect(plan.candidates, hasLength(1));
-          expect(plan.candidates.first.packageName, 'explicit_outcome');
-          expect(plan.dependencyUpdates, isEmpty);
-        },
-      );
+      test('dependency propagation: only explicit_outcome selected '
+          'does not release explicit', () {
+        final changesets = [
+          const Changeset(
+            bumps: {'explicit_outcome': BumpLevel.minor},
+            notes: '- Only outcome.',
+          ),
+        ];
+        final plan = ReleasePlanner.plan(changesets);
+        expect(plan.candidates, hasLength(1));
+        expect(plan.candidates.first.packageName, 'explicit_outcome');
+        expect(plan.dependencyUpdates, isEmpty);
+      });
 
       test('collects notes from all changesets per package', () {
         final changesets = [
@@ -391,9 +371,7 @@ explicit: minor
       });
 
       test('fails with remediation message', () {
-        final changedFiles = [
-          'packages/explicit/lib/src/utils.dart',
-        ];
+        final changedFiles = ['packages/explicit/lib/src/utils.dart'];
         final result = ReleasePlanner.check(
           changedFiles: changedFiles,
           changesets: [],
@@ -417,9 +395,7 @@ explicit: minor
       });
 
       test('passes when changeset covers one of two changed packages', () {
-        final changedFiles = [
-          'packages/explicit_outcome/lib/src/a.dart',
-        ];
+        final changedFiles = ['packages/explicit_outcome/lib/src/a.dart'];
         final changesets = [
           const Changeset(
             bumps: {'explicit_outcome': BumpLevel.patch},
@@ -450,10 +426,7 @@ explicit: minor
         );
         expect(result.passed, isFalse);
         expect(result.missingPackages, contains('explicit'));
-        expect(
-          result.missingPackages,
-          isNot(contains('explicit_outcome')),
-        );
+        expect(result.missingPackages, isNot(contains('explicit_outcome')));
       });
     });
   });
@@ -734,10 +707,7 @@ explicit: minor
   "tag": "explicit/v0.0.2"
 }
 ''';
-      expect(
-        () => ReleaseProvenance.fromJson(jsonStr),
-        throwsFormatException,
-      );
+      expect(() => ReleaseProvenance.fromJson(jsonStr), throwsFormatException);
     });
 
     test('fromJson throws when tag is missing', () {
@@ -752,10 +722,7 @@ explicit: minor
   "changelogNotesHash": "bbb"
 }
 ''';
-      expect(
-        () => ReleaseProvenance.fromJson(jsonStr),
-        throwsFormatException,
-      );
+      expect(() => ReleaseProvenance.fromJson(jsonStr), throwsFormatException);
     });
 
     test('toJson roundtrip preserves previousVersion and tag', () {
@@ -789,10 +756,7 @@ explicit: minor
   "tag": "explicit/v0.0.2"
 }
 ''';
-      expect(
-        () => ReleaseProvenance.fromJson(jsonStr),
-        throwsFormatException,
-      );
+      expect(() => ReleaseProvenance.fromJson(jsonStr), throwsFormatException);
     });
   });
 
@@ -817,31 +781,19 @@ explicit: minor
     });
 
     test('rejects malformed semver (two parts)', () {
-      expect(
-        () => TagParser.parse('explicit/v1.0'),
-        throwsFormatException,
-      );
+      expect(() => TagParser.parse('explicit/v1.0'), throwsFormatException);
     });
 
     test('rejects malformed semver (non-numeric)', () {
-      expect(
-        () => TagParser.parse('explicit/v1.abc.3'),
-        throwsFormatException,
-      );
+      expect(() => TagParser.parse('explicit/v1.abc.3'), throwsFormatException);
     });
 
     test('rejects tag without v prefix', () {
-      expect(
-        () => TagParser.parse('explicit/1.0.0'),
-        throwsFormatException,
-      );
+      expect(() => TagParser.parse('explicit/1.0.0'), throwsFormatException);
     });
 
     test('rejects tag without slash separator', () {
-      expect(
-        () => TagParser.parse('explicit_v1.0.0'),
-        throwsFormatException,
-      );
+      expect(() => TagParser.parse('explicit_v1.0.0'), throwsFormatException);
     });
 
     test('rejects empty tag', () {
@@ -1077,10 +1029,7 @@ description: Test.
       );
       expect(result.isValid, isFalse);
       expect(result.errors, isNotEmpty);
-      expect(
-        result.errors.any((e) => e.contains('provenance')),
-        isTrue,
-      );
+      expect(result.errors.any((e) => e.contains('provenance')), isTrue);
     });
 
     test('fails closed when provenance is malformed', () {
@@ -1091,10 +1040,7 @@ description: Test.
         provenanceJson: 'not json at all',
       );
       expect(result.isValid, isFalse);
-      expect(
-        result.errors.any((e) => e.contains('provenance')),
-        isTrue,
-      );
+      expect(result.errors.any((e) => e.contains('provenance')), isTrue);
     });
 
     test('fails when tag version disagrees with pubspec', () {
@@ -1130,10 +1076,7 @@ description: Test.
         provenanceJson: provenanceJson,
       );
       expect(result.isValid, isFalse);
-      expect(
-        result.errors.any((e) => e.contains('version')),
-        isTrue,
-      );
+      expect(result.errors.any((e) => e.contains('version')), isTrue);
     });
 
     test('fails when provenance version disagrees with tag', () {
@@ -1204,251 +1147,221 @@ description: Test.
         provenanceJson: provenanceJson,
       );
       expect(result.isValid, isFalse);
-      expect(
-        result.errors.any((e) => e.contains('changelog')),
-        isTrue,
-      );
+      expect(result.errors.any((e) => e.contains('changelog')), isTrue);
     });
 
-    test(
-      'validateRelease runs dependency preflight for explicit package '
-      'and fails when explicit_outcome version is missing',
-      () {
-        const explicitPubspec = '''
+    test('validateRelease runs dependency preflight for explicit package '
+        'and fails when explicit_outcome version is missing', () {
+      const explicitPubspec = '''
 name: explicit
 version: 0.0.2
 description: Test.
 dependencies:
   explicit_outcome: ^0.2.0
 ''';
-        const changelog = '''
+      const changelog = '''
 # Changelog
 
 ## 0.0.2 (2026-07-09)
 
 - Feature.
 ''';
-        final validProvenanceJson = provenanceJson(
-          packageName: 'explicit',
-          version: '0.0.2',
-          nextVersion: '0.0.2',
-          bump: 'patch',
-          impactProof: const ['packages/explicit/lib/src/explicit.dart'],
-          notes: '- Feature.',
-          changesetContents: const [
-            '---\nexplicit: patch\n---\n\n- Feature.',
-          ],
-        );
-        final result = ReleaseValidator.validateRelease(
-          tag: 'explicit/v0.0.2',
-          pubspecContent: explicitPubspec,
-          changelogContent: changelog,
-          provenanceJson: validProvenanceJson,
-          metadataFetcher: (_) => const PubDevMetadata(
-            packageName: 'explicit_outcome',
-            versions: ['0.0.1', '0.1.0'],
-          ),
-        );
-        expect(result.isValid, isFalse);
-        expect(
-          result.errors.any((e) => e.contains('explicit_outcome')),
-          isTrue,
-          reason: 'Preflight should block when required dep version missing',
-        );
-      },
-    );
+      final validProvenanceJson = provenanceJson(
+        packageName: 'explicit',
+        version: '0.0.2',
+        nextVersion: '0.0.2',
+        bump: 'patch',
+        impactProof: const ['packages/explicit/lib/src/explicit.dart'],
+        notes: '- Feature.',
+        changesetContents: const ['---\nexplicit: patch\n---\n\n- Feature.'],
+      );
+      final result = ReleaseValidator.validateRelease(
+        tag: 'explicit/v0.0.2',
+        pubspecContent: explicitPubspec,
+        changelogContent: changelog,
+        provenanceJson: validProvenanceJson,
+        metadataFetcher: (_) => const PubDevMetadata(
+          packageName: 'explicit_outcome',
+          versions: ['0.0.1', '0.1.0'],
+        ),
+      );
+      expect(result.isValid, isFalse);
+      expect(
+        result.errors.any((e) => e.contains('explicit_outcome')),
+        isTrue,
+        reason: 'Preflight should block when required dep version missing',
+      );
+    });
 
-    test(
-      'validateRelease passes preflight when explicit_outcome version '
-      'is available',
-      () {
-        const explicitPubspec = '''
+    test('validateRelease passes preflight when explicit_outcome version '
+        'is available', () {
+      const explicitPubspec = '''
 name: explicit
 version: 0.0.2
 description: Test.
 dependencies:
   explicit_outcome: ^0.1.0
 ''';
-        const changelog = '''
+      const changelog = '''
 # Changelog
 
 ## 0.0.2 (2026-07-09)
 
 - Feature.
 ''';
-        final validProvenanceJson = provenanceJson(
-          packageName: 'explicit',
-          version: '0.0.2',
-          nextVersion: '0.0.2',
-          bump: 'patch',
-          impactProof: const ['packages/explicit/lib/src/explicit.dart'],
-          notes: '- Feature.',
-          changesetContents: const [
-            '---\nexplicit: patch\n---\n\n- Feature.',
-          ],
-        );
-        final result = ReleaseValidator.validateRelease(
-          tag: 'explicit/v0.0.2',
-          pubspecContent: explicitPubspec,
-          changelogContent: changelog,
-          provenanceJson: validProvenanceJson,
-          metadataFetcher: (_) => const PubDevMetadata(
-            packageName: 'explicit_outcome',
-            versions: ['0.0.1', '0.1.0'],
-          ),
-        );
-        expect(result.isValid, isTrue, reason: result.errors.join('\n'));
-        expect(result.errors, isEmpty);
-      },
-    );
+      final validProvenanceJson = provenanceJson(
+        packageName: 'explicit',
+        version: '0.0.2',
+        nextVersion: '0.0.2',
+        bump: 'patch',
+        impactProof: const ['packages/explicit/lib/src/explicit.dart'],
+        notes: '- Feature.',
+        changesetContents: const ['---\nexplicit: patch\n---\n\n- Feature.'],
+      );
+      final result = ReleaseValidator.validateRelease(
+        tag: 'explicit/v0.0.2',
+        pubspecContent: explicitPubspec,
+        changelogContent: changelog,
+        provenanceJson: validProvenanceJson,
+        metadataFetcher: (_) => const PubDevMetadata(
+          packageName: 'explicit_outcome',
+          versions: ['0.0.1', '0.1.0'],
+        ),
+      );
+      expect(result.isValid, isTrue, reason: result.errors.join('\n'));
+      expect(result.errors, isEmpty);
+    });
 
-    test(
-      'validateRelease fails closed on preflight metadata error',
-      () {
-        const explicitPubspec = '''
+    test('validateRelease fails closed on preflight metadata error', () {
+      const explicitPubspec = '''
 name: explicit
 version: 0.0.2
 description: Test.
 dependencies:
   explicit_outcome: ^0.1.0
 ''';
-        const changelog = '''
+      const changelog = '''
 # Changelog
 
 ## 0.0.2 (2026-07-09)
 
 - Feature.
 ''';
-        final result = ReleaseValidator.validateRelease(
-          tag: 'explicit/v0.0.2',
-          pubspecContent: explicitPubspec,
-          changelogContent: changelog,
-          provenanceJson: provenanceJson(
-            packageName: 'explicit',
-            version: '0.0.2',
-            nextVersion: '0.0.2',
-            bump: 'patch',
-            impactProof: const ['packages/explicit/lib/src/explicit.dart'],
-            notes: '- Feature.',
-            changesetContents: const [
-              '---\nexplicit: patch\n---\n\n- Feature.',
-            ],
-          ),
-          metadataFetcher: (_) {
-            throw Exception('Network timeout');
-          },
-        );
-        expect(result.isValid, isFalse);
-        expect(
-          result.errors.any((e) => e.contains('metadata')),
-          isTrue,
-        );
-      },
-    );
+      final result = ReleaseValidator.validateRelease(
+        tag: 'explicit/v0.0.2',
+        pubspecContent: explicitPubspec,
+        changelogContent: changelog,
+        provenanceJson: provenanceJson(
+          packageName: 'explicit',
+          version: '0.0.2',
+          nextVersion: '0.0.2',
+          bump: 'patch',
+          impactProof: const ['packages/explicit/lib/src/explicit.dart'],
+          notes: '- Feature.',
+          changesetContents: const ['---\nexplicit: patch\n---\n\n- Feature.'],
+        ),
+        metadataFetcher: (_) {
+          throw Exception('Network timeout');
+        },
+      );
+      expect(result.isValid, isFalse);
+      expect(result.errors.any((e) => e.contains('metadata')), isTrue);
+    });
 
-    test(
-      'validateRelease skips preflight for explicit_outcome package',
-      () {
-        const pubspec = '''
+    test('validateRelease skips preflight for explicit_outcome package', () {
+      const pubspec = '''
 name: explicit_outcome
 version: 0.1.0
 description: Test.
 ''';
-        const changelog = '''
+      const changelog = '''
 # Changelog
 
 ## 0.1.0 (2026-07-09)
 
 - Feature.
 ''';
-        final validProvenanceJson = provenanceJson(notes: '- Feature.');
-        // metadataFetcher should never be called for explicit_outcome.
-        var fetcherCalled = false;
-        final result = ReleaseValidator.validateRelease(
-          tag: 'explicit_outcome/v0.1.0',
-          pubspecContent: pubspec,
-          changelogContent: changelog,
-          provenanceJson: validProvenanceJson,
-          metadataFetcher: (_) {
-            fetcherCalled = true;
-            throw Exception('Should not be called');
-          },
-        );
-        expect(result.isValid, isTrue);
-        expect(fetcherCalled, isFalse);
-      },
-    );
+      final validProvenanceJson = provenanceJson(notes: '- Feature.');
+      // metadataFetcher should never be called for explicit_outcome.
+      var fetcherCalled = false;
+      final result = ReleaseValidator.validateRelease(
+        tag: 'explicit_outcome/v0.1.0',
+        pubspecContent: pubspec,
+        changelogContent: changelog,
+        provenanceJson: validProvenanceJson,
+        metadataFetcher: (_) {
+          fetcherCalled = true;
+          throw Exception('Should not be called');
+        },
+      );
+      expect(result.isValid, isTrue);
+      expect(fetcherCalled, isFalse);
+    });
 
-    test(
-      'validateRelease detects major from provenance bump field',
-      () {
-        const pubspec = '''
+    test('validateRelease detects major from provenance bump field', () {
+      const pubspec = '''
 name: explicit_outcome
 version: 1.0.0
 description: Test.
 ''';
-        const changelog = '''
+      const changelog = '''
 # Changelog
 
 ## 1.0.0 (2026-07-09)
 
 - Breaking change.
 ''';
-        final validProvenanceJson = provenanceJson(
-          version: '1.0.0',
-          previousVersion: '0.9.0',
-          nextVersion: '1.0.0',
-          bump: 'major',
-          notes: '- Breaking change.',
-          changesetContents: const [
-            '---\nexplicit_outcome: major\n---\n\n- Breaking change.',
-          ],
-        );
-        final result = ReleaseValidator.validateRelease(
-          tag: 'explicit_outcome/v1.0.0',
-          pubspecContent: pubspec,
-          changelogContent: changelog,
-          provenanceJson: validProvenanceJson,
-        );
-        expect(result.isValid, isTrue);
-        expect(result.isMajor, isTrue);
-      },
-    );
+      final validProvenanceJson = provenanceJson(
+        version: '1.0.0',
+        previousVersion: '0.9.0',
+        nextVersion: '1.0.0',
+        bump: 'major',
+        notes: '- Breaking change.',
+        changesetContents: const [
+          '---\nexplicit_outcome: major\n---\n\n- Breaking change.',
+        ],
+      );
+      final result = ReleaseValidator.validateRelease(
+        tag: 'explicit_outcome/v1.0.0',
+        pubspecContent: pubspec,
+        changelogContent: changelog,
+        provenanceJson: validProvenanceJson,
+      );
+      expect(result.isValid, isTrue);
+      expect(result.isMajor, isTrue);
+    });
 
-    test(
-      'validateRelease non-major when provenance bump is minor',
-      () {
-        const pubspec = '''
+    test('validateRelease non-major when provenance bump is minor', () {
+      const pubspec = '''
 name: explicit_outcome
 version: 0.2.0
 description: Test.
 ''';
-        const changelog = '''
+      const changelog = '''
 # Changelog
 
 ## 0.2.0 (2026-07-09)
 
 - Feature.
 ''';
-        final validProvenanceJson = provenanceJson(
-          version: '0.2.0',
-          previousVersion: '0.1.0',
-          nextVersion: '0.2.0',
-          notes: '- Feature.',
-          changesetContents: const [
-            '---\nexplicit_outcome: minor\n---\n\n- Feature.',
-          ],
-        );
-        final result = ReleaseValidator.validateRelease(
-          tag: 'explicit_outcome/v0.2.0',
-          pubspecContent: pubspec,
-          changelogContent: changelog,
-          provenanceJson: validProvenanceJson,
-        );
-        expect(result.isValid, isTrue);
-        expect(result.isMajor, isFalse);
-      },
-    );
+      final validProvenanceJson = provenanceJson(
+        version: '0.2.0',
+        previousVersion: '0.1.0',
+        nextVersion: '0.2.0',
+        notes: '- Feature.',
+        changesetContents: const [
+          '---\nexplicit_outcome: minor\n---\n\n- Feature.',
+        ],
+      );
+      final result = ReleaseValidator.validateRelease(
+        tag: 'explicit_outcome/v0.2.0',
+        pubspecContent: pubspec,
+        changelogContent: changelog,
+        provenanceJson: validProvenanceJson,
+      );
+      expect(result.isValid, isTrue);
+      expect(result.isMajor, isFalse);
+    });
 
     // Corrective Slice 2: provenance consistency validation.
     test(
@@ -1496,23 +1409,21 @@ description: Test.
       },
     );
 
-    test(
-      'fails when provenance bump is patch but versions imply major',
-      () {
-        const pubspec = '''
+    test('fails when provenance bump is patch but versions imply major', () {
+      const pubspec = '''
 name: explicit_outcome
 version: 1.0.0
 description: Test.
 ''';
-        const changelog = '''
+      const changelog = '''
 # Changelog
 
 ## 1.0.0 (2026-07-09)
 
 - Breaking change.
 ''';
-        // Provenance claims bump=patch but 0.9.0 → 1.0.0 is a major bump.
-        const provenanceJson = '''
+      // Provenance claims bump=patch but 0.9.0 → 1.0.0 is a major bump.
+      const provenanceJson = '''
 {
   "package": "explicit_outcome",
   "version": "1.0.0",
@@ -1525,40 +1436,35 @@ description: Test.
   "provenanceSource": "release_version_pr.version-pr.v1"
 }
 ''';
-        final result = ReleaseValidator.validateRelease(
-          tag: 'explicit_outcome/v1.0.0',
-          pubspecContent: pubspec,
-          changelogContent: changelog,
-          provenanceJson: provenanceJson,
-        );
-        expect(result.isValid, isFalse);
-        expect(
-          result.errors.any(
-            (e) => e.contains('major') || e.contains('bump'),
-          ),
-          isTrue,
-          reason: 'Should detect major bypass via previousVersion/nextVersion',
-        );
-      },
-    );
+      final result = ReleaseValidator.validateRelease(
+        tag: 'explicit_outcome/v1.0.0',
+        pubspecContent: pubspec,
+        changelogContent: changelog,
+        provenanceJson: provenanceJson,
+      );
+      expect(result.isValid, isFalse);
+      expect(
+        result.errors.any((e) => e.contains('major') || e.contains('bump')),
+        isTrue,
+        reason: 'Should detect major bypass via previousVersion/nextVersion',
+      );
+    });
 
-    test(
-      'fails when provenance bump is minor but versions imply major',
-      () {
-        const pubspec = '''
+    test('fails when provenance bump is minor but versions imply major', () {
+      const pubspec = '''
 name: explicit
 version: 2.0.0
 description: Test.
 ''';
-        const changelog = '''
+      const changelog = '''
 # Changelog
 
 ## 2.0.0 (2026-07-09)
 
 - Breaking.
 ''';
-        // Provenance claims bump=minor but 1.5.0 → 2.0.0 is major.
-        const provenanceJson = '''
+      // Provenance claims bump=minor but 1.5.0 → 2.0.0 is major.
+      const provenanceJson = '''
 {
   "package": "explicit",
   "version": "2.0.0",
@@ -1571,97 +1477,83 @@ description: Test.
   "provenanceSource": "release_version_pr.version-pr.v1"
 }
 ''';
-        final result = ReleaseValidator.validateRelease(
-          tag: 'explicit/v2.0.0',
-          pubspecContent: pubspec,
-          changelogContent: changelog,
-          provenanceJson: provenanceJson,
-        );
-        expect(result.isValid, isFalse);
-        expect(
-          result.errors.any(
-            (e) => e.contains('major') || e.contains('bump'),
-          ),
-          isTrue,
-        );
-      },
-    );
+      final result = ReleaseValidator.validateRelease(
+        tag: 'explicit/v2.0.0',
+        pubspecContent: pubspec,
+        changelogContent: changelog,
+        provenanceJson: provenanceJson,
+      );
+      expect(result.isValid, isFalse);
+      expect(
+        result.errors.any((e) => e.contains('major') || e.contains('bump')),
+        isTrue,
+      );
+    });
 
-    test(
-      'passes when provenance previousVersion + bump matches version',
-      () {
-        const pubspec = '''
+    test('passes when provenance previousVersion + bump matches version', () {
+      const pubspec = '''
 name: explicit_outcome
 version: 0.1.0
 description: Test.
 ''';
-        const changelog = '''
+      const changelog = '''
 # Changelog
 
 ## 0.1.0 (2026-07-09)
 
 - Feature.
 ''';
-        // Correct: 0.0.1 + minor = 0.1.0.
-        final validProvenanceJson = provenanceJson(notes: '- Feature.');
-        final result = ReleaseValidator.validateRelease(
-          tag: 'explicit_outcome/v0.1.0',
-          pubspecContent: pubspec,
-          changelogContent: changelog,
-          provenanceJson: validProvenanceJson,
-        );
-        expect(result.isValid, isTrue);
-      },
-    );
+      // Correct: 0.0.1 + minor = 0.1.0.
+      final validProvenanceJson = provenanceJson(notes: '- Feature.');
+      final result = ReleaseValidator.validateRelease(
+        tag: 'explicit_outcome/v0.1.0',
+        pubspecContent: pubspec,
+        changelogContent: changelog,
+        provenanceJson: validProvenanceJson,
+      );
+      expect(result.isValid, isTrue);
+    });
 
-    test(
-      'manual version edit without provenance fails closed',
-      () {
-        const pubspec = '''
+    test('manual version edit without provenance fails closed', () {
+      const pubspec = '''
 name: explicit_outcome
 version: 0.5.0
 description: Test.
 ''';
-        const changelog = '''
+      const changelog = '''
 # Changelog
 
 ## 0.5.0 (2026-07-09)
 
 - Manual edit.
 ''';
-        // No provenance — simulates manual version edit.
-        final result = ReleaseValidator.validateRelease(
-          tag: 'explicit_outcome/v0.5.0',
-          pubspecContent: pubspec,
-          changelogContent: changelog,
-          provenanceJson: null,
-        );
-        expect(result.isValid, isFalse);
-        expect(
-          result.errors.any((e) => e.contains('provenance')),
-          isTrue,
-        );
-      },
-    );
+      // No provenance — simulates manual version edit.
+      final result = ReleaseValidator.validateRelease(
+        tag: 'explicit_outcome/v0.5.0',
+        pubspecContent: pubspec,
+        changelogContent: changelog,
+        provenanceJson: null,
+      );
+      expect(result.isValid, isFalse);
+      expect(result.errors.any((e) => e.contains('provenance')), isTrue);
+    });
 
-    test(
-      'fails when provenance tag does not match release tag',
-      () {
-        const pubspec = '''
+    test('fails when provenance tag does not match release tag', () {
+      const pubspec = '''
 name: explicit_outcome
 version: 0.1.0
 description: Test.
 ''';
-        const changelog = '''
+      const changelog = '''
 # Changelog
 
 ## 0.1.0 (2026-07-09)
 
 - Feature.
 ''';
-        // Provenance tag says explicit/v0.1.0 but release tag is
-        // explicit_outcome/v0.1.0.
-        const provenanceJson = '''
+      // Provenance tag says explicit/v0.1.0 but release tag is
+      // explicit_outcome/v0.1.0.
+      const provenanceJson = '''
 {
   "package": "explicit_outcome",
   "version": "0.1.0",
@@ -1674,36 +1566,30 @@ description: Test.
   "provenanceSource": "release_version_pr.version-pr.v1"
 }
 ''';
-        final result = ReleaseValidator.validateRelease(
-          tag: 'explicit_outcome/v0.1.0',
-          pubspecContent: pubspec,
-          changelogContent: changelog,
-          provenanceJson: provenanceJson,
-        );
-        expect(result.isValid, isFalse);
-        expect(
-          result.errors.any((e) => e.contains('tag')),
-          isTrue,
-        );
-      },
-    );
+      final result = ReleaseValidator.validateRelease(
+        tag: 'explicit_outcome/v0.1.0',
+        pubspecContent: pubspec,
+        changelogContent: changelog,
+        provenanceJson: provenanceJson,
+      );
+      expect(result.isValid, isFalse);
+      expect(result.errors.any((e) => e.contains('tag')), isTrue);
+    });
 
-    test(
-      'fails when provenance nextVersion does not match version',
-      () {
-        const pubspec = '''
+    test('fails when provenance nextVersion does not match version', () {
+      const pubspec = '''
 name: explicit_outcome
 version: 0.1.0
 description: Test.
 ''';
-        const changelog = '''
+      const changelog = '''
 # Changelog
 
 ## 0.1.0 (2026-07-09)
 
 - Feature.
 ''';
-        const provenanceJson = '''
+      const provenanceJson = '''
 {
   "package": "explicit_outcome",
   "version": "0.1.0",
@@ -1716,36 +1602,30 @@ description: Test.
   "provenanceSource": "release_version_pr.version-pr.v1"
 }
 ''';
-        final result = ReleaseValidator.validateRelease(
-          tag: 'explicit_outcome/v0.1.0',
-          pubspecContent: pubspec,
-          changelogContent: changelog,
-          provenanceJson: provenanceJson,
-        );
-        expect(result.isValid, isFalse);
-        expect(
-          result.errors.any((e) => e.contains('nextVersion')),
-          isTrue,
-        );
-      },
-    );
+      final result = ReleaseValidator.validateRelease(
+        tag: 'explicit_outcome/v0.1.0',
+        pubspecContent: pubspec,
+        changelogContent: changelog,
+        provenanceJson: provenanceJson,
+      );
+      expect(result.isValid, isFalse);
+      expect(result.errors.any((e) => e.contains('nextVersion')), isTrue);
+    });
 
-    test(
-      'fails when provenance bump is not one of patch minor major',
-      () {
-        const pubspec = '''
+    test('fails when provenance bump is not one of patch minor major', () {
+      const pubspec = '''
 name: explicit_outcome
 version: 0.1.0
 description: Test.
 ''';
-        const changelog = '''
+      const changelog = '''
 # Changelog
 
 ## 0.1.0 (2026-07-09)
 
 - Feature.
 ''';
-        const provenanceJson = '''
+      const provenanceJson = '''
 {
   "package": "explicit_outcome",
   "version": "0.1.0",
@@ -1758,19 +1638,15 @@ description: Test.
   "provenanceSource": "release_version_pr.version-pr.v1"
 }
 ''';
-        final result = ReleaseValidator.validateRelease(
-          tag: 'explicit_outcome/v0.1.0',
-          pubspecContent: pubspec,
-          changelogContent: changelog,
-          provenanceJson: provenanceJson,
-        );
-        expect(result.isValid, isFalse);
-        expect(
-          result.errors.any((e) => e.contains('bump')),
-          isTrue,
-        );
-      },
-    );
+      final result = ReleaseValidator.validateRelease(
+        tag: 'explicit_outcome/v0.1.0',
+        pubspecContent: pubspec,
+        changelogContent: changelog,
+        provenanceJson: provenanceJson,
+      );
+      expect(result.isValid, isFalse);
+      expect(result.errors.any((e) => e.contains('bump')), isTrue);
+    });
   });
 
   group('DependencyPreflight', () {
@@ -1837,10 +1713,7 @@ dependencies:
         },
       );
       expect(result.isSatisfied, isFalse);
-      expect(
-        result.errors.any((e) => e.contains('metadata')),
-        isTrue,
-      );
+      expect(result.errors.any((e) => e.contains('metadata')), isTrue);
     });
 
     test('skips preflight when explicit has no explicit_outcome dep', () {
@@ -2008,10 +1881,7 @@ dependencies:
       ];
       final result = ImpactClassifier.classify(files);
       expect(result.classifications, hasLength(1));
-      expect(
-        result.classifications.first.category,
-        ImpactCategory.realImpact,
-      );
+      expect(result.classifications.first.category, ImpactCategory.realImpact);
       expect(result.classifications.first.packageName, 'explicit_outcome');
     });
 
@@ -2024,10 +1894,7 @@ dependencies:
       ];
       final result = ImpactClassifier.classify(files);
       expect(result.classifications, hasLength(1));
-      expect(
-        result.classifications.first.category,
-        ImpactCategory.commentOnly,
-      );
+      expect(result.classifications.first.category, ImpactCategory.commentOnly);
     });
 
     test('classifies lib Dart file with whitespace-only diff', () {
@@ -2045,14 +1912,9 @@ dependencies:
     });
 
     test('classifies README.md as docsOnly', () {
-      const files = [
-        ChangedFile(path: 'packages/explicit/README.md'),
-      ];
+      const files = [ChangedFile(path: 'packages/explicit/README.md')];
       final result = ImpactClassifier.classify(files);
-      expect(
-        result.classifications.first.category,
-        ImpactCategory.docsOnly,
-      );
+      expect(result.classifications.first.category, ImpactCategory.docsOnly);
     });
 
     test('classifies CHANGELOG.md as docsOnly', () {
@@ -2060,36 +1922,21 @@ dependencies:
         ChangedFile(path: 'packages/explicit_outcome/CHANGELOG.md'),
       ];
       final result = ImpactClassifier.classify(files);
-      expect(
-        result.classifications.first.category,
-        ImpactCategory.docsOnly,
-      );
+      expect(result.classifications.first.category, ImpactCategory.docsOnly);
     });
 
     test('classifies test files as testOnly', () {
       const files = [
-        ChangedFile(
-          path: 'packages/explicit/test/src/utils_test.dart',
-        ),
+        ChangedFile(path: 'packages/explicit/test/src/utils_test.dart'),
       ];
       final result = ImpactClassifier.classify(files);
-      expect(
-        result.classifications.first.category,
-        ImpactCategory.testOnly,
-      );
+      expect(result.classifications.first.category, ImpactCategory.testOnly);
     });
 
     test('classifies example files as exampleOnly', () {
-      const files = [
-        ChangedFile(
-          path: 'packages/explicit/example/main.dart',
-        ),
-      ];
+      const files = [ChangedFile(path: 'packages/explicit/example/main.dart')];
       final result = ImpactClassifier.classify(files);
-      expect(
-        result.classifications.first.category,
-        ImpactCategory.exampleOnly,
-      );
+      expect(result.classifications.first.category, ImpactCategory.exampleOnly);
     });
 
     test('classifies non-package files as notPublishable', () {
@@ -2106,26 +1953,16 @@ dependencies:
     });
 
     test('classifies pubspec.yaml as real impact', () {
-      const files = [
-        ChangedFile(path: 'packages/explicit/pubspec.yaml'),
-      ];
+      const files = [ChangedFile(path: 'packages/explicit/pubspec.yaml')];
       final result = ImpactClassifier.classify(files);
-      expect(
-        result.classifications.first.category,
-        ImpactCategory.realImpact,
-      );
+      expect(result.classifications.first.category, ImpactCategory.realImpact);
       expect(result.classifications.first.packageName, 'explicit');
     });
 
     test('lib file without diff falls back to path-based: real impact', () {
-      const files = [
-        ChangedFile(path: 'packages/explicit/lib/src/utils.dart'),
-      ];
+      const files = [ChangedFile(path: 'packages/explicit/lib/src/utils.dart')];
       final result = ImpactClassifier.classify(files);
-      expect(
-        result.classifications.first.category,
-        ImpactCategory.realImpact,
-      );
+      expect(result.classifications.first.category, ImpactCategory.realImpact);
     });
 
     test('aggregates package impact correctly', () {
@@ -2134,9 +1971,7 @@ dependencies:
           path: 'packages/explicit_outcome/lib/src/a.dart',
           diffContent: '+  final int value;',
         ),
-        ChangedFile(
-          path: 'packages/explicit_outcome/README.md',
-        ),
+        ChangedFile(path: 'packages/explicit_outcome/README.md'),
         ChangedFile(
           path: 'packages/explicit/lib/src/b.dart',
           diffContent: '+  // just a comment',
@@ -2147,17 +1982,11 @@ dependencies:
 
       // explicit_outcome has real impact (lib/src/a.dart has code change)
       expect(result.packageImpacts.containsKey('explicit_outcome'), isTrue);
-      expect(
-        result.packageImpacts['explicit_outcome']!.hasRealImpact,
-        isTrue,
-      );
+      expect(result.packageImpacts['explicit_outcome']!.hasRealImpact, isTrue);
 
       // explicit has NO real impact (comment-only change)
       expect(result.packageImpacts.containsKey('explicit'), isTrue);
-      expect(
-        result.packageImpacts['explicit']!.hasRealImpact,
-        isFalse,
-      );
+      expect(result.packageImpacts['explicit']!.hasRealImpact, isFalse);
     });
 
     test('impactedPackages returns only packages with real impact', () {
@@ -2231,173 +2060,137 @@ dependencies:
   });
 
   group('ReleaseReconciler', () {
-    test(
-      'intent + impact produces release candidate',
-      () {
-        final changesets = [
-          const Changeset(
-            bumps: {'explicit_outcome': BumpLevel.minor},
-            notes: '- Add option API.',
-          ),
-        ];
-        const files = [
-          ChangedFile(
-            path: 'packages/explicit_outcome/lib/src/option.dart',
-            diffContent: '+  T get value => _value;',
-          ),
-        ];
-        final result = ReleaseReconciler.reconcile(
-          changedFiles: files,
-          changesets: changesets,
-        );
-        expect(result.releaseCandidates, hasLength(1));
-        expect(
-          result.releaseCandidates.first.packageName,
-          'explicit_outcome',
-        );
-        expect(result.releaseCandidates.first.bump, BumpLevel.minor);
-        expect(result.missingIntentFailures, isEmpty);
-        expect(result.unusedIntentWarnings, isEmpty);
-      },
-    );
+    test('intent + impact produces release candidate', () {
+      final changesets = [
+        const Changeset(
+          bumps: {'explicit_outcome': BumpLevel.minor},
+          notes: '- Add option API.',
+        ),
+      ];
+      const files = [
+        ChangedFile(
+          path: 'packages/explicit_outcome/lib/src/option.dart',
+          diffContent: '+  T get value => _value;',
+        ),
+      ];
+      final result = ReleaseReconciler.reconcile(
+        changedFiles: files,
+        changesets: changesets,
+      );
+      expect(result.releaseCandidates, hasLength(1));
+      expect(result.releaseCandidates.first.packageName, 'explicit_outcome');
+      expect(result.releaseCandidates.first.bump, BumpLevel.minor);
+      expect(result.missingIntentFailures, isEmpty);
+      expect(result.unusedIntentWarnings, isEmpty);
+    });
 
-    test(
-      'impact without changeset produces missingIntentFailure',
-      () {
-        const files = [
-          ChangedFile(
-            path: 'packages/explicit_outcome/lib/src/option.dart',
-            diffContent: '+  T get value => _value;',
-          ),
-        ];
-        final result = ReleaseReconciler.reconcile(
-          changedFiles: files,
-          changesets: [],
-        );
-        expect(result.releaseCandidates, isEmpty);
-        expect(result.missingIntentFailures, hasLength(1));
-        expect(
-          result.missingIntentFailures.first.packageName,
-          'explicit_outcome',
-        );
-        expect(
-          result.missingIntentFailures.first.remediation,
-          contains('explicit_outcome'),
-        );
-        expect(result.unusedIntentWarnings, isEmpty);
-      },
-    );
+    test('impact without changeset produces missingIntentFailure', () {
+      const files = [
+        ChangedFile(
+          path: 'packages/explicit_outcome/lib/src/option.dart',
+          diffContent: '+  T get value => _value;',
+        ),
+      ];
+      final result = ReleaseReconciler.reconcile(
+        changedFiles: files,
+        changesets: [],
+      );
+      expect(result.releaseCandidates, isEmpty);
+      expect(result.missingIntentFailures, hasLength(1));
+      expect(
+        result.missingIntentFailures.first.packageName,
+        'explicit_outcome',
+      );
+      expect(
+        result.missingIntentFailures.first.remediation,
+        contains('explicit_outcome'),
+      );
+      expect(result.unusedIntentWarnings, isEmpty);
+    });
 
-    test(
-      'changeset without real impact produces unusedIntentWarning',
-      () {
-        final changesets = [
-          const Changeset(
-            bumps: {'explicit_outcome': BumpLevel.patch},
-            notes: '- Fix something.',
-          ),
-        ];
-        const files = [
-          ChangedFile(path: 'packages/explicit_outcome/README.md'),
-          ChangedFile(
-            path: 'packages/explicit_outcome/lib/src/a.dart',
-            diffContent: '+  // comment only change',
-          ),
-        ];
-        final result = ReleaseReconciler.reconcile(
-          changedFiles: files,
-          changesets: changesets,
-        );
-        expect(result.releaseCandidates, isEmpty);
-        expect(result.missingIntentFailures, isEmpty);
-        expect(result.unusedIntentWarnings, hasLength(1));
-        expect(
-          result.unusedIntentWarnings.first.packageName,
-          'explicit_outcome',
-        );
-        expect(
-          result.unusedIntentWarnings.first.reason,
-          contains('no real'),
-        );
-      },
-    );
+    test('changeset without real impact produces unusedIntentWarning', () {
+      final changesets = [
+        const Changeset(
+          bumps: {'explicit_outcome': BumpLevel.patch},
+          notes: '- Fix something.',
+        ),
+      ];
+      const files = [
+        ChangedFile(path: 'packages/explicit_outcome/README.md'),
+        ChangedFile(
+          path: 'packages/explicit_outcome/lib/src/a.dart',
+          diffContent: '+  // comment only change',
+        ),
+      ];
+      final result = ReleaseReconciler.reconcile(
+        changedFiles: files,
+        changesets: changesets,
+      );
+      expect(result.releaseCandidates, isEmpty);
+      expect(result.missingIntentFailures, isEmpty);
+      expect(result.unusedIntentWarnings, hasLength(1));
+      expect(result.unusedIntentWarnings.first.packageName, 'explicit_outcome');
+      expect(result.unusedIntentWarnings.first.reason, contains('no real'));
+    });
 
-    test(
-      'mixed: one package has intent+impact, other has impact only',
-      () {
-        final changesets = [
-          const Changeset(
-            bumps: {'explicit_outcome': BumpLevel.minor},
-            notes: '- Add feature.',
-          ),
-        ];
-        const files = [
-          ChangedFile(
-            path: 'packages/explicit_outcome/lib/src/a.dart',
-            diffContent: '+  class NewApi {}',
-          ),
-          ChangedFile(
-            path: 'packages/explicit/lib/src/b.dart',
-            diffContent: '+  void newFunction() {}',
-          ),
-        ];
-        final result = ReleaseReconciler.reconcile(
-          changedFiles: files,
-          changesets: changesets,
-        );
-        // explicit_outcome: intent + impact → candidate
-        expect(result.releaseCandidates, hasLength(1));
-        expect(
-          result.releaseCandidates.first.packageName,
-          'explicit_outcome',
-        );
-        // explicit: impact without intent → failure
-        expect(result.missingIntentFailures, hasLength(1));
-        expect(
-          result.missingIntentFailures.first.packageName,
-          'explicit',
-        );
-      },
-    );
+    test('mixed: one package has intent+impact, other has impact only', () {
+      final changesets = [
+        const Changeset(
+          bumps: {'explicit_outcome': BumpLevel.minor},
+          notes: '- Add feature.',
+        ),
+      ];
+      const files = [
+        ChangedFile(
+          path: 'packages/explicit_outcome/lib/src/a.dart',
+          diffContent: '+  class NewApi {}',
+        ),
+        ChangedFile(
+          path: 'packages/explicit/lib/src/b.dart',
+          diffContent: '+  void newFunction() {}',
+        ),
+      ];
+      final result = ReleaseReconciler.reconcile(
+        changedFiles: files,
+        changesets: changesets,
+      );
+      // explicit_outcome: intent + impact → candidate
+      expect(result.releaseCandidates, hasLength(1));
+      expect(result.releaseCandidates.first.packageName, 'explicit_outcome');
+      // explicit: impact without intent → failure
+      expect(result.missingIntentFailures, hasLength(1));
+      expect(result.missingIntentFailures.first.packageName, 'explicit');
+    });
 
-    test(
-      'mixed: one package has intent+impact, other has intent only',
-      () {
-        final changesets = [
-          const Changeset(
-            bumps: {
-              'explicit_outcome': BumpLevel.minor,
-              'explicit': BumpLevel.patch,
-            },
-            notes: '- Changes.',
-          ),
-        ];
-        const files = [
-          ChangedFile(
-            path: 'packages/explicit_outcome/lib/src/a.dart',
-            diffContent: '+  class NewApi {}',
-          ),
-          // explicit has only docs changes → no real impact
-          ChangedFile(path: 'packages/explicit/README.md'),
-        ];
-        final result = ReleaseReconciler.reconcile(
-          changedFiles: files,
-          changesets: changesets,
-        );
-        // explicit_outcome: intent + impact → candidate
-        expect(result.releaseCandidates, hasLength(1));
-        expect(
-          result.releaseCandidates.first.packageName,
-          'explicit_outcome',
-        );
-        // explicit: intent without impact → warning
-        expect(result.unusedIntentWarnings, hasLength(1));
-        expect(
-          result.unusedIntentWarnings.first.packageName,
-          'explicit',
-        );
-      },
-    );
+    test('mixed: one package has intent+impact, other has intent only', () {
+      final changesets = [
+        const Changeset(
+          bumps: {
+            'explicit_outcome': BumpLevel.minor,
+            'explicit': BumpLevel.patch,
+          },
+          notes: '- Changes.',
+        ),
+      ];
+      const files = [
+        ChangedFile(
+          path: 'packages/explicit_outcome/lib/src/a.dart',
+          diffContent: '+  class NewApi {}',
+        ),
+        // explicit has only docs changes → no real impact
+        ChangedFile(path: 'packages/explicit/README.md'),
+      ];
+      final result = ReleaseReconciler.reconcile(
+        changedFiles: files,
+        changesets: changesets,
+      );
+      // explicit_outcome: intent + impact → candidate
+      expect(result.releaseCandidates, hasLength(1));
+      expect(result.releaseCandidates.first.packageName, 'explicit_outcome');
+      // explicit: intent without impact → warning
+      expect(result.unusedIntentWarnings, hasLength(1));
+      expect(result.unusedIntentWarnings.first.packageName, 'explicit');
+    });
 
     test('hasFailures is true when missingIntentFailures exist', () {
       const files = [
@@ -2433,78 +2226,66 @@ dependencies:
       expect(result.hasFailures, isFalse);
     });
 
-    test(
-      'no impact and no intent produces empty reconciliation',
-      () {
-        const files = [
-          ChangedFile(path: 'tool/foo.dart'),
-          ChangedFile(path: 'docs/bar.md'),
-        ];
-        final result = ReleaseReconciler.reconcile(
-          changedFiles: files,
-          changesets: [],
-        );
-        expect(result.releaseCandidates, isEmpty);
-        expect(result.missingIntentFailures, isEmpty);
-        expect(result.unusedIntentWarnings, isEmpty);
-      },
-    );
+    test('no impact and no intent produces empty reconciliation', () {
+      const files = [
+        ChangedFile(path: 'tool/foo.dart'),
+        ChangedFile(path: 'docs/bar.md'),
+      ];
+      final result = ReleaseReconciler.reconcile(
+        changedFiles: files,
+        changesets: [],
+      );
+      expect(result.releaseCandidates, isEmpty);
+      expect(result.missingIntentFailures, isEmpty);
+      expect(result.unusedIntentWarnings, isEmpty);
+    });
 
-    test(
-      'missingIntentFailure includes package-specific remediation',
-      () {
-        const files = [
-          ChangedFile(
-            path: 'packages/explicit/lib/src/parser.dart',
-            diffContent: '+  class Parser {}',
-          ),
-        ];
-        final result = ReleaseReconciler.reconcile(
-          changedFiles: files,
-          changesets: [],
-        );
-        expect(result.missingIntentFailures, hasLength(1));
-        final failure = result.missingIntentFailures.first;
-        expect(failure.packageName, 'explicit');
-        expect(failure.remediation, contains('changeset'));
-        expect(failure.remediation, contains('explicit'));
-      },
-    );
+    test('missingIntentFailure includes package-specific remediation', () {
+      const files = [
+        ChangedFile(
+          path: 'packages/explicit/lib/src/parser.dart',
+          diffContent: '+  class Parser {}',
+        ),
+      ];
+      final result = ReleaseReconciler.reconcile(
+        changedFiles: files,
+        changesets: [],
+      );
+      expect(result.missingIntentFailures, hasLength(1));
+      final failure = result.missingIntentFailures.first;
+      expect(failure.packageName, 'explicit');
+      expect(failure.remediation, contains('changeset'));
+      expect(failure.remediation, contains('explicit'));
+    });
 
-    test(
-      'release candidates preserve publish order '
-      '(explicit_outcome before explicit)',
-      () {
-        final changesets = [
-          const Changeset(
-            bumps: {
-              'explicit': BumpLevel.patch,
-              'explicit_outcome': BumpLevel.minor,
-            },
-            notes: '- Both changed.',
-          ),
-        ];
-        const files = [
-          ChangedFile(
-            path: 'packages/explicit_outcome/lib/src/a.dart',
-            diffContent: '+  class A {}',
-          ),
-          ChangedFile(
-            path: 'packages/explicit/lib/src/b.dart',
-            diffContent: '+  class B {}',
-          ),
-        ];
-        final result = ReleaseReconciler.reconcile(
-          changedFiles: files,
-          changesets: changesets,
-        );
-        expect(result.releaseCandidates, hasLength(2));
-        expect(
-          result.releaseCandidates[0].packageName,
-          'explicit_outcome',
-        );
-        expect(result.releaseCandidates[1].packageName, 'explicit');
-      },
-    );
+    test('release candidates preserve publish order '
+        '(explicit_outcome before explicit)', () {
+      final changesets = [
+        const Changeset(
+          bumps: {
+            'explicit': BumpLevel.patch,
+            'explicit_outcome': BumpLevel.minor,
+          },
+          notes: '- Both changed.',
+        ),
+      ];
+      const files = [
+        ChangedFile(
+          path: 'packages/explicit_outcome/lib/src/a.dart',
+          diffContent: '+  class A {}',
+        ),
+        ChangedFile(
+          path: 'packages/explicit/lib/src/b.dart',
+          diffContent: '+  class B {}',
+        ),
+      ];
+      final result = ReleaseReconciler.reconcile(
+        changedFiles: files,
+        changesets: changesets,
+      );
+      expect(result.releaseCandidates, hasLength(2));
+      expect(result.releaseCandidates[0].packageName, 'explicit_outcome');
+      expect(result.releaseCandidates[1].packageName, 'explicit');
+    });
   });
 }

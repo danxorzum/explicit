@@ -23,11 +23,7 @@ const qualityGateFormatArgs = [
 ];
 
 /// Arguments for `dart analyze`.
-const qualityGateAnalyzeArgs = [
-  'analyze',
-  '--fatal-infos',
-  '.',
-];
+const qualityGateAnalyzeArgs = ['analyze', '--fatal-infos', '.'];
 
 /// Arguments for `dart test`.
 ///

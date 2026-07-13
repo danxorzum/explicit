@@ -89,29 +89,26 @@ void main() {
         expect(installed, isFalse);
       });
 
-      test(
-        'returns false when hook exists but lacks version marker',
-        () {
-          // Use a temp file with content that lacks the version marker
-          final tempDir = Directory.systemTemp.createTempSync('hook_test_');
-          final hookFile = File('${tempDir.path}/pre-push')
-            ..writeAsStringSync('#!/usr/bin/env bash\necho old hook\n');
+      test('returns false when hook exists but lacks version marker', () {
+        // Use a temp file with content that lacks the version marker
+        final tempDir = Directory.systemTemp.createTempSync('hook_test_');
+        final hookFile = File('${tempDir.path}/pre-push')
+          ..writeAsStringSync('#!/usr/bin/env bash\necho old hook\n');
 
-          final installed = HookInstaller.isHookInstalled(hookFile.path);
-          expect(installed, isFalse);
+        final installed = HookInstaller.isHookInstalled(hookFile.path);
+        expect(installed, isFalse);
 
-          tempDir.deleteSync(recursive: true);
-        },
-      );
+        tempDir.deleteSync(recursive: true);
+      });
 
       test('returns true when hook exists with version marker', () {
         final tempDir = Directory.systemTemp.createTempSync('hook_test_');
         final hookFile = File('${tempDir.path}/pre-push')
           ..writeAsStringSync(
-          '#!/usr/bin/env bash\n'
-          '# ${HookInstaller.hookVersion}\n'
-          'melos run quality:gate -- --mode=pre-push\n',
-        );
+            '#!/usr/bin/env bash\n'
+            '# ${HookInstaller.hookVersion}\n'
+            'melos run quality:gate -- --mode=pre-push\n',
+          );
 
         final installed = HookInstaller.isHookInstalled(hookFile.path);
         expect(installed, isTrue);

@@ -13,18 +13,15 @@ void main() {
         final changesetsDir = Directory('${tempDir.path}/.changesets')
           ..createSync();
 
-        final result = Process.runSync(
-          'dart',
-          [
-            'run',
-            'tool/release_changeset.dart',
-            'init',
-            '--package=explicit_outcome',
-            '--bump=minor',
-            '--summary=Add typed outcome map helper',
-            '--changesets-dir=${changesetsDir.path}',
-          ],
-        );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'init',
+          '--package=explicit_outcome',
+          '--bump=minor',
+          '--summary=Add typed outcome map helper',
+          '--changesets-dir=${changesetsDir.path}',
+        ]);
 
         expect(result.exitCode, 0, reason: result.stderr.toString());
 
@@ -39,27 +36,25 @@ void main() {
       });
 
       test('fails on missing required arguments', () {
-        final result = Process.runSync(
-          'dart',
-          ['run', 'tool/release_changeset.dart', 'init'],
-        );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'init',
+        ]);
 
         expect(result.exitCode, isNot(0));
         expect(result.stderr.toString(), contains('--package'));
       });
 
       test('fails on invalid bump level', () {
-        final result = Process.runSync(
-          'dart',
-          [
-            'run',
-            'tool/release_changeset.dart',
-            'init',
-            '--package=explicit_outcome',
-            '--bump=huge',
-            '--summary=Bad bump',
-          ],
-        );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'init',
+          '--package=explicit_outcome',
+          '--bump=huge',
+          '--summary=Bad bump',
+        ]);
 
         expect(result.exitCode, isNot(0));
         expect(result.stderr.toString(), contains('patch'));
@@ -81,16 +76,13 @@ explicit_outcome: minor
 - Add feature.
 ''');
 
-        final result = Process.runSync(
-          'dart',
-          [
-            'run',
-            'tool/release_changeset.dart',
-            'check',
-            '--changed-files=packages/explicit_outcome/lib/src/option/opt.dart',
-            '--changesets-dir=${changesetsDir.path}',
-          ],
-        );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'check',
+          '--changed-files=packages/explicit_outcome/lib/src/option/opt.dart',
+          '--changesets-dir=${changesetsDir.path}',
+        ]);
 
         expect(result.exitCode, 0, reason: result.stderr.toString());
         expect(result.stdout.toString(), contains('PASS'));
@@ -103,16 +95,13 @@ explicit_outcome: minor
         final changesetsDir = Directory('${tempDir.path}/.changesets')
           ..createSync();
 
-        final result = Process.runSync(
-          'dart',
-          [
-            'run',
-            'tool/release_changeset.dart',
-            'check',
-            '--changed-files=packages/explicit_outcome/lib/src/option/opt.dart',
-            '--changesets-dir=${changesetsDir.path}',
-          ],
-        );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'check',
+          '--changed-files=packages/explicit_outcome/lib/src/option/opt.dart',
+          '--changesets-dir=${changesetsDir.path}',
+        ]);
 
         expect(result.exitCode, 1);
         expect(result.stderr.toString(), contains('FAIL'));
@@ -126,16 +115,13 @@ explicit_outcome: minor
         final changesetsDir = Directory('${tempDir.path}/.changesets')
           ..createSync();
 
-        final result = Process.runSync(
-          'dart',
-          [
-            'run',
-            'tool/release_changeset.dart',
-            'check',
-            '--changed-files=tool/quality_gate.dart,docs/setup.md',
-            '--changesets-dir=${changesetsDir.path}',
-          ],
-        );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'check',
+          '--changed-files=tool/quality_gate.dart,docs/setup.md',
+          '--changesets-dir=${changesetsDir.path}',
+        ]);
 
         expect(result.exitCode, 0, reason: result.stderr.toString());
 
@@ -149,16 +135,13 @@ explicit_outcome: minor
 
         File('${changesetsDir.path}/broken.md').writeAsStringSync('not yaml');
 
-        final result = Process.runSync(
-          'dart',
-          [
-            'run',
-            'tool/release_changeset.dart',
-            'check',
-            '--changed-files=packages/explicit_outcome/lib/src/option/opt.dart',
-            '--changesets-dir=${changesetsDir.path}',
-          ],
-        );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'check',
+          '--changed-files=packages/explicit_outcome/lib/src/option/opt.dart',
+          '--changesets-dir=${changesetsDir.path}',
+        ]);
 
         expect(result.exitCode, isNot(0));
         expect(result.stderr.toString(), contains('Malformed changesets'));
@@ -168,16 +151,13 @@ explicit_outcome: minor
       });
 
       test('fails closed when git diff fails', () {
-        final result = Process.runSync(
-          'dart',
-          [
-            'run',
-            'tool/release_changeset.dart',
-            'check',
-            '--base=missing-base-sha',
-            '--head=missing-head-sha',
-          ],
-        );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'check',
+          '--base=missing-base-sha',
+          '--head=missing-head-sha',
+        ]);
 
         expect(result.exitCode, isNot(0));
         expect(result.stderr.toString(), contains('git diff failed'));
@@ -200,16 +180,13 @@ explicit_outcome: minor
 - Add outcome map.
 ''');
 
-        final result = Process.runSync(
-          'dart',
-          [
-            'run',
-            'tool/release_changeset.dart',
-            'plan',
-            '--format=markdown',
-            '--changesets-dir=${changesetsDir.path}',
-          ],
-        );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'plan',
+          '--format=markdown',
+          '--changesets-dir=${changesetsDir.path}',
+        ]);
 
         expect(result.exitCode, isNot(0));
         expect(result.stderr.toString(), contains('requires diff context'));
@@ -230,16 +207,13 @@ explicit: patch
 - Fix bug.
 ''');
 
-        final result = Process.runSync(
-          'dart',
-          [
-            'run',
-            'tool/release_changeset.dart',
-            'version-pr',
-            '--changesets-dir=${changesetsDir.path}',
-            '--workspace-root=${tempDir.path}',
-          ],
-        );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'version-pr',
+          '--changesets-dir=${changesetsDir.path}',
+          '--workspace-root=${tempDir.path}',
+        ]);
 
         expect(result.exitCode, isNot(0));
         expect(result.stderr.toString(), contains('requires diff context'));
@@ -260,17 +234,14 @@ explicit: patch
 - Fix bug.
 ''');
 
-        final result = Process.runSync(
-          'dart',
-          [
-            'run',
-            'tool/release_changeset.dart',
-            'plan',
-            '--format=json',
-            '--changed-files=tool/release_changeset.dart',
-            '--changesets-dir=${changesetsDir.path}',
-          ],
-        );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'plan',
+          '--format=json',
+          '--changed-files=tool/release_changeset.dart',
+          '--changesets-dir=${changesetsDir.path}',
+        ]);
 
         expect(result.exitCode, 0, reason: result.stderr.toString());
         final decoded =
@@ -286,17 +257,14 @@ explicit: patch
         final changesetsDir = Directory('${tempDir.path}/.changesets')
           ..createSync();
 
-        final result = Process.runSync(
-          'dart',
-          [
-            'run',
-            'tool/release_changeset.dart',
-            'plan',
-            '--format=markdown',
-            '--changed-files=tool/release_changeset.dart',
-            '--changesets-dir=${changesetsDir.path}',
-          ],
-        );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'plan',
+          '--format=markdown',
+          '--changed-files=tool/release_changeset.dart',
+          '--changesets-dir=${changesetsDir.path}',
+        ]);
 
         expect(result.exitCode, 0, reason: result.stderr.toString());
         expect(result.stdout.toString(), contains('No release candidates'));
@@ -304,43 +272,27 @@ explicit: patch
         tempDir.deleteSync(recursive: true);
       });
 
-      test(
-        'tooling workflow only diff does not require package changesets',
-        () {
-          final tempDir = Directory.systemTemp.createTempSync(
-            'changeset_test_',
-          );
-          final changesetsDir = Directory('${tempDir.path}/.changesets')
-            ..createSync();
+      test('tooling workflow only diff does not require package changesets', () {
+        final tempDir = Directory.systemTemp.createTempSync('changeset_test_');
+        final changesetsDir = Directory('${tempDir.path}/.changesets')
+          ..createSync();
 
-          final result = Process.runSync(
-            'dart',
-            [
-              'run',
-              'tool/release_changeset.dart',
-              'plan',
-              '--format=json',
-              '--changed-files=${[
-                '.changesets/README.md',
-                '.github/PULL_REQUEST_TEMPLATE.md',
-                '.github/workflows/release_version_pr.yaml',
-                'pubspec.yaml',
-                'tool/release_changeset.dart',
-                'tool/src/release_planner.dart',
-                'tool/test/release_planner_test.dart',
-              ].join(',')}',
-              '--changesets-dir=${changesetsDir.path}',
-            ],
-          );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'plan',
+          '--format=json',
+          '--changed-files=${['.changesets/README.md', '.github/PULL_REQUEST_TEMPLATE.md', '.github/workflows/release_version_pr.yaml', 'pubspec.yaml', 'tool/release_changeset.dart', 'tool/src/release_planner.dart', 'tool/test/release_planner_test.dart'].join(',')}',
+          '--changesets-dir=${changesetsDir.path}',
+        ]);
 
-          expect(result.exitCode, 0, reason: result.stderr.toString());
-          final decoded =
-              jsonDecode(result.stdout.toString()) as Map<String, dynamic>;
-          expect(decoded['candidates'], isEmpty);
+        expect(result.exitCode, 0, reason: result.stderr.toString());
+        final decoded =
+            jsonDecode(result.stdout.toString()) as Map<String, dynamic>;
+        expect(decoded['candidates'], isEmpty);
 
-          tempDir.deleteSync(recursive: true);
-        },
-      );
+        tempDir.deleteSync(recursive: true);
+      });
 
       test('ignores README but not arbitrary template-like filenames', () {
         final tempDir = Directory.systemTemp.createTempSync('changeset_test_');
@@ -362,17 +314,14 @@ explicit: minor
 - Template only.
 ''');
 
-        final result = Process.runSync(
-          'dart',
-          [
-            'run',
-            'tool/release_changeset.dart',
-            'plan',
-            '--format=markdown',
-            '--changed-files=packages/explicit/lib/src/parser.dart',
-            '--changesets-dir=${changesetsDir.path}',
-          ],
-        );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'plan',
+          '--format=markdown',
+          '--changed-files=packages/explicit/lib/src/parser.dart',
+          '--changesets-dir=${changesetsDir.path}',
+        ]);
 
         expect(result.exitCode, 0, reason: result.stderr.toString());
         expect(result.stdout.toString(), contains('Changesets loaded: 1'));
@@ -403,17 +352,14 @@ explicit: patch
 - First.
 ''');
 
-        final result = Process.runSync(
-          'dart',
-          [
-            'run',
-            'tool/release_changeset.dart',
-            'plan',
-            '--format=json',
-            '--changed-files=packages/explicit/lib/src/parser.dart',
-            '--changesets-dir=${changesetsDir.path}',
-          ],
-        );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'plan',
+          '--format=json',
+          '--changed-files=packages/explicit/lib/src/parser.dart',
+          '--changesets-dir=${changesetsDir.path}',
+        ]);
 
         expect(result.exitCode, 0, reason: result.stderr.toString());
         final decoded =
@@ -432,16 +378,13 @@ explicit: patch
 
         File('${changesetsDir.path}/broken.md').writeAsStringSync('not yaml');
 
-        final result = Process.runSync(
-          'dart',
-          [
-            'run',
-            'tool/release_changeset.dart',
-            'plan',
-            '--format=json',
-            '--changesets-dir=${changesetsDir.path}',
-          ],
-        );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'plan',
+          '--format=json',
+          '--changesets-dir=${changesetsDir.path}',
+        ]);
 
         expect(result.exitCode, isNot(0));
         expect(result.stdout.toString(), isEmpty);
@@ -452,10 +395,12 @@ explicit: patch
       });
 
       test('default docs fail closed without diff context', () {
-        final result = Process.runSync(
-          'dart',
-          ['run', 'tool/release_changeset.dart', 'plan', '--format=markdown'],
-        );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'plan',
+          '--format=markdown',
+        ]);
 
         expect(result.exitCode, isNot(0));
         expect(result.stderr.toString(), contains('requires diff context'));
@@ -521,17 +466,14 @@ explicit: patch
 - Add typed outcome API improvements.
 ''');
 
-        final result = Process.runSync(
-          'dart',
-          [
-            'run',
-            'tool/release_changeset.dart',
-            'version-pr',
-            '--changed-files=packages/explicit_outcome/lib/src/option.dart,packages/explicit/lib/src/parser.dart',
-            '--changesets-dir=${changesetsDir.path}',
-            '--workspace-root=${tempDir.path}',
-          ],
-        );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'version-pr',
+          '--changed-files=packages/explicit_outcome/lib/src/option.dart,packages/explicit/lib/src/parser.dart',
+          '--changesets-dir=${changesetsDir.path}',
+          '--workspace-root=${tempDir.path}',
+        ]);
 
         expect(result.exitCode, 0, reason: result.stderr.toString());
         expect(result.stdout.toString(), contains('explicit_outcome'));
@@ -561,17 +503,14 @@ explicit: patch
           final changesetsDir = Directory('${tempDir.path}/.changesets')
             ..createSync();
 
-          final result = Process.runSync(
-            'dart',
-            [
-              'run',
-              'tool/release_changeset.dart',
-              'version-pr',
-              '--changed-files=tool/release_changeset.dart',
-              '--changesets-dir=${changesetsDir.path}',
-              '--workspace-root=${tempDir.path}',
-            ],
-          );
+          final result = Process.runSync('dart', [
+            'run',
+            'tool/release_changeset.dart',
+            'version-pr',
+            '--changed-files=tool/release_changeset.dart',
+            '--changesets-dir=${changesetsDir.path}',
+            '--workspace-root=${tempDir.path}',
+          ]);
 
           expect(result.exitCode, 0, reason: result.stderr.toString());
           expect(
@@ -583,15 +522,11 @@ explicit: patch
         },
       );
 
-      test(
-        'no-candidates message distinguishes unused changeset intent',
-        () {
-          final tempDir = Directory.systemTemp.createTempSync(
-            'version_pr_test_',
-          );
-          final changesetsDir = Directory('${tempDir.path}/.changesets')
-            ..createSync();
-          File('${changesetsDir.path}/unused.md').writeAsStringSync('''
+      test('no-candidates message distinguishes unused changeset intent', () {
+        final tempDir = Directory.systemTemp.createTempSync('version_pr_test_');
+        final changesetsDir = Directory('${tempDir.path}/.changesets')
+          ..createSync();
+        File('${changesetsDir.path}/unused.md').writeAsStringSync('''
 ---
 explicit_outcome: patch
 ---
@@ -599,32 +534,28 @@ explicit_outcome: patch
 - Intent without real impact.
 ''');
 
-          final result = Process.runSync(
-            'dart',
-            [
-              'run',
-              'tool/release_changeset.dart',
-              'version-pr',
-              '--changed-files=packages/explicit_outcome/README.md',
-              '--changesets-dir=${changesetsDir.path}',
-              '--workspace-root=${tempDir.path}',
-            ],
-          );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'version-pr',
+          '--changed-files=packages/explicit_outcome/README.md',
+          '--changesets-dir=${changesetsDir.path}',
+          '--workspace-root=${tempDir.path}',
+        ]);
 
-          expect(result.exitCode, 0, reason: result.stderr.toString());
-          expect(result.stdout.toString(), contains('No release candidates'));
-          expect(
-            result.stdout.toString(),
-            contains('changeset intent has no real package impact'),
-          );
-          expect(
-            result.stdout.toString(),
-            isNot(contains('no changesets found')),
-          );
+        expect(result.exitCode, 0, reason: result.stderr.toString());
+        expect(result.stdout.toString(), contains('No release candidates'));
+        expect(
+          result.stdout.toString(),
+          contains('changeset intent has no real package impact'),
+        );
+        expect(
+          result.stdout.toString(),
+          isNot(contains('no changesets found')),
+        );
 
-          tempDir.deleteSync(recursive: true);
-        },
-      );
+        tempDir.deleteSync(recursive: true);
+      });
 
       test('logs edits with package names and versions', () {
         final tempDir = Directory.systemTemp.createTempSync('version_pr_test_');
@@ -659,17 +590,14 @@ explicit_outcome: patch
 - Fix edge case in outcome mapping.
 ''');
 
-        final result = Process.runSync(
-          'dart',
-          [
-            'run',
-            'tool/release_changeset.dart',
-            'version-pr',
-            '--changed-files=packages/explicit_outcome/lib/src/option.dart',
-            '--changesets-dir=${changesetsDir.path}',
-            '--workspace-root=${tempDir.path}',
-          ],
-        );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'version-pr',
+          '--changed-files=packages/explicit_outcome/lib/src/option.dart',
+          '--changesets-dir=${changesetsDir.path}',
+          '--workspace-root=${tempDir.path}',
+        ]);
 
         expect(result.exitCode, 0, reason: result.stderr.toString());
         expect(result.stdout.toString(), contains('explicit_outcome'));
@@ -743,17 +671,14 @@ explicit_outcome: minor
           }),
         );
 
-        final result = Process.runSync(
-          'dart',
-          [
-            'run',
-            'tool/release_changeset.dart',
-            'validate-release',
-            '--tag=explicit_outcome/v0.1.0',
-            '--workspace-root=${tempDir.path}',
-            '--changesets-dir=${tempDir.path}/.changesets',
-          ],
-        );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'validate-release',
+          '--tag=explicit_outcome/v0.1.0',
+          '--workspace-root=${tempDir.path}',
+          '--changesets-dir=${tempDir.path}/.changesets',
+        ]);
 
         expect(result.exitCode, 0, reason: result.stderr.toString());
         expect(result.stdout.toString(), contains('explicit_outcome'));
@@ -792,17 +717,14 @@ description: Dart typed outcomes.
         // No provenance manifest created.
         Directory('${tempDir.path}/.changesets').createSync();
 
-        final result = Process.runSync(
-          'dart',
-          [
-            'run',
-            'tool/release_changeset.dart',
-            'validate-release',
-            '--tag=explicit_outcome/v0.1.0',
-            '--workspace-root=${tempDir.path}',
-            '--changesets-dir=${tempDir.path}/.changesets',
-          ],
-        );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'validate-release',
+          '--tag=explicit_outcome/v0.1.0',
+          '--workspace-root=${tempDir.path}',
+          '--changesets-dir=${tempDir.path}/.changesets',
+        ]);
 
         expect(result.exitCode, isNot(0));
         expect(result.stdout.toString(), contains('provenance'));
@@ -811,29 +733,23 @@ description: Dart typed outcomes.
       });
 
       test('fails on invalid tag format', () {
-        final result = Process.runSync(
-          'dart',
-          [
-            'run',
-            'tool/release_changeset.dart',
-            'validate-release',
-            '--tag=unknown_pkg/v1.0.0',
-          ],
-        );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'validate-release',
+          '--tag=unknown_pkg/v1.0.0',
+        ]);
 
         expect(result.exitCode, isNot(0));
         expect(result.stderr.toString(), contains('Unknown package'));
       });
 
       test('fails when --tag is missing', () {
-        final result = Process.runSync(
-          'dart',
-          [
-            'run',
-            'tool/release_changeset.dart',
-            'validate-release',
-          ],
-        );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'validate-release',
+        ]);
 
         expect(result.exitCode, isNot(0));
         expect(result.stderr.toString(), contains('--tag'));
@@ -901,17 +817,14 @@ explicit_outcome: minor
           }),
         );
 
-        final result = Process.runSync(
-          'dart',
-          [
-            'run',
-            'tool/release_changeset.dart',
-            'validate-release',
-            '--tag=explicit_outcome/v0.1.0',
-            '--workspace-root=${tempDir.path}',
-            '--changesets-dir=${tempDir.path}/.changesets',
-          ],
-        );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'validate-release',
+          '--tag=explicit_outcome/v0.1.0',
+          '--workspace-root=${tempDir.path}',
+          '--changesets-dir=${tempDir.path}/.changesets',
+        ]);
 
         expect(result.exitCode, 0, reason: result.stderr.toString());
 
@@ -968,17 +881,14 @@ description: Dart typed outcomes.
         // No provenance manifest — should fail closed.
         Directory('${tempDir.path}/.changesets').createSync();
 
-        final result = Process.runSync(
-          'dart',
-          [
-            'run',
-            'tool/release_changeset.dart',
-            'validate-release',
-            '--tag=explicit_outcome/v0.1.0',
-            '--workspace-root=${tempDir.path}',
-            '--changesets-dir=${tempDir.path}/.changesets',
-          ],
-        );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'validate-release',
+          '--tag=explicit_outcome/v0.1.0',
+          '--workspace-root=${tempDir.path}',
+          '--changesets-dir=${tempDir.path}/.changesets',
+        ]);
 
         expect(result.exitCode, isNot(0));
 
@@ -1004,10 +914,11 @@ description: Dart typed outcomes.
 
     group('unknown subcommand', () {
       test('shows usage and exits non-zero', () {
-        final result = Process.runSync(
-          'dart',
-          ['run', 'tool/release_changeset.dart', 'unknown'],
-        );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'unknown',
+        ]);
 
         expect(result.exitCode, isNot(0));
         expect(result.stderr.toString(), contains('Usage'));
@@ -1034,11 +945,10 @@ description: Dart typed outcomes.
     /// directory. Uses absolute path so it works from any temp git repo.
     ProcessResult runTool(List<String> args, {required String workingDir}) {
       final toolPath = '$projectRoot/tool/release_changeset.dart';
-      return Process.runSync(
-        'dart',
-        [toolPath, ...args],
-        workingDirectory: workingDir,
-      );
+      return Process.runSync('dart', [
+        toolPath,
+        ...args,
+      ], workingDirectory: workingDir);
     }
 
     /// Helper: creates a temp git repo with an initial commit containing
@@ -1049,16 +959,16 @@ description: Dart typed outcomes.
       );
 
       Process.runSync('git', ['init'], workingDirectory: tempDir.path);
-      Process.runSync(
-        'git',
-        ['config', 'user.email', 'test@test.com'],
-        workingDirectory: tempDir.path,
-      );
-      Process.runSync(
-        'git',
-        ['config', 'user.name', 'Test'],
-        workingDirectory: tempDir.path,
-      );
+      Process.runSync('git', [
+        'config',
+        'user.email',
+        'test@test.com',
+      ], workingDirectory: tempDir.path);
+      Process.runSync('git', [
+        'config',
+        'user.name',
+        'Test',
+      ], workingDirectory: tempDir.path);
 
       // Create package scaffolding.
       Directory(
@@ -1091,22 +1001,21 @@ description: Dart typed outcomes.
       ).writeAsStringSync('# Changelog\n\n## 0.0.1\n\n- Initial.\n');
 
       Process.runSync('git', ['add', '.'], workingDirectory: tempDir.path);
-      Process.runSync(
-        'git',
-        ['commit', '-m', 'initial'],
-        workingDirectory: tempDir.path,
-      );
+      Process.runSync('git', [
+        'commit',
+        '-m',
+        'initial',
+      ], workingDirectory: tempDir.path);
 
       return tempDir.path;
     }
 
     /// Helper: gets the HEAD commit SHA from a git repo.
     String getHeadSha(String repoPath) {
-      final result = Process.runSync(
-        'git',
-        ['rev-parse', 'HEAD'],
-        workingDirectory: repoPath,
-      );
+      final result = Process.runSync('git', [
+        'rev-parse',
+        'HEAD',
+      ], workingDirectory: repoPath);
       return (result.stdout as String).trim();
     }
 
@@ -1123,24 +1032,21 @@ description: Dart typed outcomes.
         );
 
         Process.runSync('git', ['add', '.'], workingDirectory: repoPath);
-        Process.runSync(
-          'git',
-          ['commit', '-m', 'update comment'],
-          workingDirectory: repoPath,
-        );
+        Process.runSync('git', [
+          'commit',
+          '-m',
+          'update comment',
+        ], workingDirectory: repoPath);
         final headSha = getHeadSha(repoPath);
 
         final changesetsDir = Directory('$repoPath/.changesets')..createSync();
 
-        final result = runTool(
-          [
-            'check',
-            '--base=$baseSha',
-            '--head=$headSha',
-            '--changesets-dir=${changesetsDir.path}',
-          ],
-          workingDir: repoPath,
-        );
+        final result = runTool([
+          'check',
+          '--base=$baseSha',
+          '--head=$headSha',
+          '--changesets-dir=${changesetsDir.path}',
+        ], workingDir: repoPath);
 
         // Comment-only change has no real impact → no changeset needed → PASS.
         expect(
@@ -1162,29 +1068,24 @@ description: Dart typed outcomes.
         // Make a whitespace/formatting-only change.
         File(
           '$repoPath/packages/explicit/lib/src/parser.dart',
-        ).writeAsStringSync(
-          'class Parser {\n    void parse() {}\n}\n',
-        );
+        ).writeAsStringSync('class Parser {\n    void parse() {}\n}\n');
 
         Process.runSync('git', ['add', '.'], workingDirectory: repoPath);
-        Process.runSync(
-          'git',
-          ['commit', '-m', 'formatting'],
-          workingDirectory: repoPath,
-        );
+        Process.runSync('git', [
+          'commit',
+          '-m',
+          'formatting',
+        ], workingDirectory: repoPath);
         final headSha = getHeadSha(repoPath);
 
         final changesetsDir = Directory('$repoPath/.changesets')..createSync();
 
-        final result = runTool(
-          [
-            'check',
-            '--base=$baseSha',
-            '--head=$headSha',
-            '--changesets-dir=${changesetsDir.path}',
-          ],
-          workingDir: repoPath,
-        );
+        final result = runTool([
+          'check',
+          '--base=$baseSha',
+          '--head=$headSha',
+          '--changesets-dir=${changesetsDir.path}',
+        ], workingDir: repoPath);
 
         expect(
           result.exitCode,
@@ -1209,24 +1110,21 @@ description: Dart typed outcomes.
         );
 
         Process.runSync('git', ['add', '.'], workingDirectory: repoPath);
-        Process.runSync(
-          'git',
-          ['commit', '-m', 'add getter'],
-          workingDirectory: repoPath,
-        );
+        Process.runSync('git', [
+          'commit',
+          '-m',
+          'add getter',
+        ], workingDirectory: repoPath);
         final headSha = getHeadSha(repoPath);
 
         final changesetsDir = Directory('$repoPath/.changesets')..createSync();
 
-        final result = runTool(
-          [
-            'check',
-            '--base=$baseSha',
-            '--head=$headSha',
-            '--changesets-dir=${changesetsDir.path}',
-          ],
-          workingDir: repoPath,
-        );
+        final result = runTool([
+          'check',
+          '--base=$baseSha',
+          '--head=$headSha',
+          '--changesets-dir=${changesetsDir.path}',
+        ], workingDir: repoPath);
 
         // Real impact without changeset → FAIL with remediation.
         expect(
@@ -1255,11 +1153,11 @@ description: Dart typed outcomes.
           );
 
           Process.runSync('git', ['add', '.'], workingDirectory: repoPath);
-          Process.runSync(
-            'git',
-            ['commit', '-m', 'comment only'],
-            workingDirectory: repoPath,
-          );
+          Process.runSync('git', [
+            'commit',
+            '-m',
+            'comment only',
+          ], workingDirectory: repoPath);
           final headSha = getHeadSha(repoPath);
 
           // Create a changeset for explicit_outcome (but no real impact).
@@ -1273,15 +1171,12 @@ explicit_outcome: patch
 - Fix something.
 ''');
 
-          final result = runTool(
-            [
-              'check',
-              '--base=$baseSha',
-              '--head=$headSha',
-              '--changesets-dir=${changesetsDir.path}',
-            ],
-            workingDir: repoPath,
-          );
+          final result = runTool([
+            'check',
+            '--base=$baseSha',
+            '--head=$headSha',
+            '--changesets-dir=${changesetsDir.path}',
+          ], workingDir: repoPath);
 
           // No real impact → no changeset needed → PASS.
           // But should warn about unused intent.
@@ -1315,26 +1210,23 @@ explicit_outcome: patch
             'class Option<T> {\n  final T value;\n  T unwrap() => value;\n}\n',
           );
           Process.runSync('git', ['add', '.'], workingDirectory: repoPath);
-          Process.runSync(
-            'git',
-            ['commit', '-m', 'add unwrap'],
-            workingDirectory: repoPath,
-          );
+          Process.runSync('git', [
+            'commit',
+            '-m',
+            'add unwrap',
+          ], workingDirectory: repoPath);
           final headSha = getHeadSha(repoPath);
 
           final changesetsDir = Directory('$repoPath/.changesets')
             ..createSync();
 
-          final result = runTool(
-            [
-              'plan',
-              '--format=markdown',
-              '--base=$baseSha',
-              '--head=$headSha',
-              '--changesets-dir=${changesetsDir.path}',
-            ],
-            workingDir: repoPath,
-          );
+          final result = runTool([
+            'plan',
+            '--format=markdown',
+            '--base=$baseSha',
+            '--head=$headSha',
+            '--changesets-dir=${changesetsDir.path}',
+          ], workingDir: repoPath);
 
           expect(result.exitCode, isNot(0));
           expect(result.stderr.toString(), contains('FAIL'));
@@ -1361,11 +1253,11 @@ explicit_outcome: patch
           ).writeAsStringSync('# Updated docs\n');
 
           Process.runSync('git', ['add', '.'], workingDirectory: repoPath);
-          Process.runSync(
-            'git',
-            ['commit', '-m', 'docs only'],
-            workingDirectory: repoPath,
-          );
+          Process.runSync('git', [
+            'commit',
+            '-m',
+            'docs only',
+          ], workingDirectory: repoPath);
           final headSha = getHeadSha(repoPath);
 
           // Create a changeset for explicit_outcome (but no real impact).
@@ -1379,16 +1271,13 @@ explicit_outcome: patch
 - Fix something.
 ''');
 
-          final result = runTool(
-            [
-              'plan',
-              '--format=json',
-              '--base=$baseSha',
-              '--head=$headSha',
-              '--changesets-dir=${changesetsDir.path}',
-            ],
-            workingDir: repoPath,
-          );
+          final result = runTool([
+            'plan',
+            '--format=json',
+            '--base=$baseSha',
+            '--head=$headSha',
+            '--changesets-dir=${changesetsDir.path}',
+          ], workingDir: repoPath);
 
           expect(result.exitCode, 0, reason: result.stderr.toString());
 
@@ -1409,32 +1298,29 @@ explicit_outcome: patch
         },
       );
 
-      test(
-        'real code diff + changeset produces candidate '
-        'for impacted package only',
-        () {
-          final repoPath = createGitRepoWithPackages();
-          final baseSha = getHeadSha(repoPath);
+      test('real code diff + changeset produces candidate '
+          'for impacted package only', () {
+        final repoPath = createGitRepoWithPackages();
+        final baseSha = getHeadSha(repoPath);
 
-          // Make a real code change only in explicit_outcome.
-          File(
-            '$repoPath/packages/explicit_outcome/lib/src/option.dart',
-          ).writeAsStringSync(
-            'class Option<T> {\n  final T value;\n  T unwrap() => value;\n}\n',
-          );
+        // Make a real code change only in explicit_outcome.
+        File(
+          '$repoPath/packages/explicit_outcome/lib/src/option.dart',
+        ).writeAsStringSync(
+          'class Option<T> {\n  final T value;\n  T unwrap() => value;\n}\n',
+        );
 
-          Process.runSync('git', ['add', '.'], workingDirectory: repoPath);
-          Process.runSync(
-            'git',
-            ['commit', '-m', 'add unwrap'],
-            workingDirectory: repoPath,
-          );
-          final headSha = getHeadSha(repoPath);
+        Process.runSync('git', ['add', '.'], workingDirectory: repoPath);
+        Process.runSync('git', [
+          'commit',
+          '-m',
+          'add unwrap',
+        ], workingDirectory: repoPath);
+        final headSha = getHeadSha(repoPath);
 
-          // Create changesets for BOTH packages.
-          final changesetsDir = Directory('$repoPath/.changesets')
-            ..createSync();
-          File('${changesetsDir.path}/feature.md').writeAsStringSync('''
+        // Create changesets for BOTH packages.
+        final changesetsDir = Directory('$repoPath/.changesets')..createSync();
+        File('${changesetsDir.path}/feature.md').writeAsStringSync('''
 ---
 explicit_outcome: minor
 explicit: patch
@@ -1443,62 +1329,55 @@ explicit: patch
 - Add features.
 ''');
 
-          final result = runTool(
-            [
-              'plan',
-              '--format=json',
-              '--base=$baseSha',
-              '--head=$headSha',
-              '--changesets-dir=${changesetsDir.path}',
-            ],
-            workingDir: repoPath,
-          );
+        final result = runTool([
+          'plan',
+          '--format=json',
+          '--base=$baseSha',
+          '--head=$headSha',
+          '--changesets-dir=${changesetsDir.path}',
+        ], workingDir: repoPath);
 
-          expect(result.exitCode, 0, reason: result.stderr.toString());
+        expect(result.exitCode, 0, reason: result.stderr.toString());
 
-          final decoded =
-              jsonDecode(result.stdout.toString()) as Map<String, dynamic>;
-          final candidates = decoded['candidates'] as List<dynamic>;
+        final decoded =
+            jsonDecode(result.stdout.toString()) as Map<String, dynamic>;
+        final candidates = decoded['candidates'] as List<dynamic>;
 
-          // Only explicit_outcome has real impact → only it
-          // should be candidate.
-          expect(candidates, hasLength(1));
-          expect(
-            (candidates.first as Map<String, dynamic>)['package'],
-            'explicit_outcome',
-          );
+        // Only explicit_outcome has real impact → only it
+        // should be candidate.
+        expect(candidates, hasLength(1));
+        expect(
+          (candidates.first as Map<String, dynamic>)['package'],
+          'explicit_outcome',
+        );
 
-          Directory(repoPath).deleteSync(recursive: true);
-        },
-      );
+        Directory(repoPath).deleteSync(recursive: true);
+      });
     });
 
     group('content-aware version-pr', () {
-      test(
-        'version-pr applies edits only for reconciled candidates',
-        () {
-          final repoPath = createGitRepoWithPackages();
-          final baseSha = getHeadSha(repoPath);
+      test('version-pr applies edits only for reconciled candidates', () {
+        final repoPath = createGitRepoWithPackages();
+        final baseSha = getHeadSha(repoPath);
 
-          // Make a real code change only in explicit_outcome.
-          File(
-            '$repoPath/packages/explicit_outcome/lib/src/option.dart',
-          ).writeAsStringSync(
-            'class Option<T> {\n  final T value;\n  T unwrap() => value;\n}\n',
-          );
+        // Make a real code change only in explicit_outcome.
+        File(
+          '$repoPath/packages/explicit_outcome/lib/src/option.dart',
+        ).writeAsStringSync(
+          'class Option<T> {\n  final T value;\n  T unwrap() => value;\n}\n',
+        );
 
-          Process.runSync('git', ['add', '.'], workingDirectory: repoPath);
-          Process.runSync(
-            'git',
-            ['commit', '-m', 'add unwrap'],
-            workingDirectory: repoPath,
-          );
-          final headSha = getHeadSha(repoPath);
+        Process.runSync('git', ['add', '.'], workingDirectory: repoPath);
+        Process.runSync('git', [
+          'commit',
+          '-m',
+          'add unwrap',
+        ], workingDirectory: repoPath);
+        final headSha = getHeadSha(repoPath);
 
-          // Create changesets for both packages.
-          final changesetsDir = Directory('$repoPath/.changesets')
-            ..createSync();
-          File('${changesetsDir.path}/feature.md').writeAsStringSync('''
+        // Create changesets for both packages.
+        final changesetsDir = Directory('$repoPath/.changesets')..createSync();
+        File('${changesetsDir.path}/feature.md').writeAsStringSync('''
 ---
 explicit_outcome: minor
 explicit: patch
@@ -1507,65 +1386,58 @@ explicit: patch
 - Add features.
 ''');
 
-          final result = runTool(
-            [
-              'version-pr',
-              '--base=$baseSha',
-              '--head=$headSha',
-              '--changesets-dir=${changesetsDir.path}',
-              '--workspace-root=$repoPath',
-            ],
-            workingDir: repoPath,
-          );
+        final result = runTool([
+          'version-pr',
+          '--base=$baseSha',
+          '--head=$headSha',
+          '--changesets-dir=${changesetsDir.path}',
+          '--workspace-root=$repoPath',
+        ], workingDir: repoPath);
 
-          expect(result.exitCode, 0, reason: result.stderr.toString());
+        expect(result.exitCode, 0, reason: result.stderr.toString());
 
-          // explicit_outcome should be bumped.
-          final outcomePubspec = File(
-            '$repoPath/packages/explicit_outcome/pubspec.yaml',
-          ).readAsStringSync();
-          expect(outcomePubspec, contains('version: 0.1.0'));
+        // explicit_outcome should be bumped.
+        final outcomePubspec = File(
+          '$repoPath/packages/explicit_outcome/pubspec.yaml',
+        ).readAsStringSync();
+        expect(outcomePubspec, contains('version: 0.1.0'));
 
-          // explicit should NOT be bumped (no real impact).
-          final explicitPubspec = File(
-            '$repoPath/packages/explicit/pubspec.yaml',
-          ).readAsStringSync();
-          expect(
-            explicitPubspec,
-            contains('version: 0.0.1'),
-            reason: 'explicit has no real impact, should not be bumped',
-          );
+        // explicit should NOT be bumped (no real impact).
+        final explicitPubspec = File(
+          '$repoPath/packages/explicit/pubspec.yaml',
+        ).readAsStringSync();
+        expect(
+          explicitPubspec,
+          contains('version: 0.0.1'),
+          reason: 'explicit has no real impact, should not be bumped',
+        );
 
-          Directory(repoPath).deleteSync(recursive: true);
-        },
-      );
+        Directory(repoPath).deleteSync(recursive: true);
+      });
 
-      test(
-        'version-pr --base --head writes provenance only for '
-        'reconciled candidates',
-        () {
-          final repoPath = createGitRepoWithPackages();
-          final baseSha = getHeadSha(repoPath);
+      test('version-pr --base --head writes provenance only for '
+          'reconciled candidates', () {
+        final repoPath = createGitRepoWithPackages();
+        final baseSha = getHeadSha(repoPath);
 
-          // Real code change only in explicit_outcome.
-          File(
-            '$repoPath/packages/explicit_outcome/lib/src/option.dart',
-          ).writeAsStringSync(
-            'class Option<T> {\n  final T value;\n  T unwrap() => value;\n}\n',
-          );
+        // Real code change only in explicit_outcome.
+        File(
+          '$repoPath/packages/explicit_outcome/lib/src/option.dart',
+        ).writeAsStringSync(
+          'class Option<T> {\n  final T value;\n  T unwrap() => value;\n}\n',
+        );
 
-          Process.runSync('git', ['add', '.'], workingDirectory: repoPath);
-          Process.runSync(
-            'git',
-            ['commit', '-m', 'add unwrap'],
-            workingDirectory: repoPath,
-          );
-          final headSha = getHeadSha(repoPath);
+        Process.runSync('git', ['add', '.'], workingDirectory: repoPath);
+        Process.runSync('git', [
+          'commit',
+          '-m',
+          'add unwrap',
+        ], workingDirectory: repoPath);
+        final headSha = getHeadSha(repoPath);
 
-          // Changeset declares intent for both packages.
-          final changesetsDir = Directory('$repoPath/.changesets')
-            ..createSync();
-          File('${changesetsDir.path}/feature.md').writeAsStringSync('''
+        // Changeset declares intent for both packages.
+        final changesetsDir = Directory('$repoPath/.changesets')..createSync();
+        File('${changesetsDir.path}/feature.md').writeAsStringSync('''
 ---
 explicit_outcome: minor
 explicit: patch
@@ -1574,86 +1446,77 @@ explicit: patch
 - Add features.
 ''');
 
-          final result = runTool(
-            [
-              'version-pr',
-              '--base=$baseSha',
-              '--head=$headSha',
-              '--changesets-dir=${changesetsDir.path}',
-              '--workspace-root=$repoPath',
-            ],
-            workingDir: repoPath,
-          );
+        final result = runTool([
+          'version-pr',
+          '--base=$baseSha',
+          '--head=$headSha',
+          '--changesets-dir=${changesetsDir.path}',
+          '--workspace-root=$repoPath',
+        ], workingDir: repoPath);
 
-          expect(result.exitCode, 0, reason: result.stderr.toString());
+        expect(result.exitCode, 0, reason: result.stderr.toString());
 
-          // Provenance should exist for explicit_outcome (reconciled).
-          final outcomeProvFile = File(
-            '${changesetsDir.path}/releases/'
-            'explicit_outcome-0.1.0.json',
-          );
-          expect(
-            outcomeProvFile.existsSync(),
-            isTrue,
-            reason: 'Provenance should be emitted for reconciled candidate',
-          );
+        // Provenance should exist for explicit_outcome (reconciled).
+        final outcomeProvFile = File(
+          '${changesetsDir.path}/releases/'
+          'explicit_outcome-0.1.0.json',
+        );
+        expect(
+          outcomeProvFile.existsSync(),
+          isTrue,
+          reason: 'Provenance should be emitted for reconciled candidate',
+        );
 
-          // Verify provenance content includes previousVersion and tag.
-          final prov =
-              jsonDecode(
-                    outcomeProvFile.readAsStringSync(),
-                  )
-                  as Map<String, dynamic>;
-          expect(prov['package'], 'explicit_outcome');
-          expect(prov['version'], '0.1.0');
-          expect(prov['previousVersion'], '0.0.1');
-          expect(prov['nextVersion'], '0.1.0');
-          expect(prov['bump'], 'minor');
-          expect(prov['tag'], 'explicit_outcome/v0.1.0');
-          expect(
-            prov['impactProof'],
-            contains('packages/explicit_outcome/lib/src/option.dart'),
-          );
+        // Verify provenance content includes previousVersion and tag.
+        final prov =
+            jsonDecode(outcomeProvFile.readAsStringSync())
+                as Map<String, dynamic>;
+        expect(prov['package'], 'explicit_outcome');
+        expect(prov['version'], '0.1.0');
+        expect(prov['previousVersion'], '0.0.1');
+        expect(prov['nextVersion'], '0.1.0');
+        expect(prov['bump'], 'minor');
+        expect(prov['tag'], 'explicit_outcome/v0.1.0');
+        expect(
+          prov['impactProof'],
+          contains('packages/explicit_outcome/lib/src/option.dart'),
+        );
 
-          // Provenance should NOT exist for explicit (not reconciled).
-          final explicitProvFile = File(
-            '${changesetsDir.path}/releases/explicit-0.0.2.json',
-          );
-          expect(
-            explicitProvFile.existsSync(),
-            isFalse,
-            reason:
-                'Provenance must NOT be emitted for changeset intent '
-                'without real impact',
-          );
+        // Provenance should NOT exist for explicit (not reconciled).
+        final explicitProvFile = File(
+          '${changesetsDir.path}/releases/explicit-0.0.2.json',
+        );
+        expect(
+          explicitProvFile.existsSync(),
+          isFalse,
+          reason:
+              'Provenance must NOT be emitted for changeset intent '
+              'without real impact',
+        );
 
-          Directory(repoPath).deleteSync(recursive: true);
-        },
-      );
+        Directory(repoPath).deleteSync(recursive: true);
+      });
 
-      test(
-        'changeset without real impact does not emit provenance',
-        () {
-          final repoPath = createGitRepoWithPackages();
-          final baseSha = getHeadSha(repoPath);
+      test('changeset without real impact does not emit provenance', () {
+        final repoPath = createGitRepoWithPackages();
+        final baseSha = getHeadSha(repoPath);
 
-          // Only a doc change (no real impact).
-          File(
-            '$repoPath/packages/explicit_outcome/README.md',
-          ).writeAsStringSync('# Updated docs\n');
+        // Only a doc change (no real impact).
+        File(
+          '$repoPath/packages/explicit_outcome/README.md',
+        ).writeAsStringSync('# Updated docs\n');
 
-          Process.runSync('git', ['add', '.'], workingDirectory: repoPath);
-          Process.runSync(
-            'git',
-            ['commit', '-m', 'docs only'],
-            workingDirectory: repoPath,
-          );
-          final headSha = getHeadSha(repoPath);
+        Process.runSync('git', ['add', '.'], workingDirectory: repoPath);
+        Process.runSync('git', [
+          'commit',
+          '-m',
+          'docs only',
+        ], workingDirectory: repoPath);
+        final headSha = getHeadSha(repoPath);
 
-          // Changeset declares intent for explicit_outcome.
-          final changesetsDir = Directory('$repoPath/.changesets')
-            ..createSync();
-          File('${changesetsDir.path}/fix.md').writeAsStringSync('''
+        // Changeset declares intent for explicit_outcome.
+        final changesetsDir = Directory('$repoPath/.changesets')..createSync();
+        File('${changesetsDir.path}/fix.md').writeAsStringSync('''
 ---
 explicit_outcome: patch
 ---
@@ -1661,61 +1524,53 @@ explicit_outcome: patch
 - Fix something.
 ''');
 
-          final result = runTool(
-            [
-              'version-pr',
-              '--base=$baseSha',
-              '--head=$headSha',
-              '--changesets-dir=${changesetsDir.path}',
-              '--workspace-root=$repoPath',
-            ],
-            workingDir: repoPath,
-          );
+        final result = runTool([
+          'version-pr',
+          '--base=$baseSha',
+          '--head=$headSha',
+          '--changesets-dir=${changesetsDir.path}',
+          '--workspace-root=$repoPath',
+        ], workingDir: repoPath);
 
-          expect(result.exitCode, 0, reason: result.stderr.toString());
+        expect(result.exitCode, 0, reason: result.stderr.toString());
 
-          // No provenance should be emitted (no real impact).
-          final releasesDir = Directory(
-            '${changesetsDir.path}/releases',
-          );
-          final hasProvenance =
-              releasesDir.existsSync() && releasesDir.listSync().isNotEmpty;
-          expect(
-            hasProvenance,
-            isFalse,
-            reason:
-                'No provenance should be emitted when changeset '
-                'has no real package impact',
-          );
+        // No provenance should be emitted (no real impact).
+        final releasesDir = Directory('${changesetsDir.path}/releases');
+        final hasProvenance =
+            releasesDir.existsSync() && releasesDir.listSync().isNotEmpty;
+        expect(
+          hasProvenance,
+          isFalse,
+          reason:
+              'No provenance should be emitted when changeset '
+              'has no real package impact',
+        );
 
-          Directory(repoPath).deleteSync(recursive: true);
-        },
-      );
+        Directory(repoPath).deleteSync(recursive: true);
+      });
     });
 
     group('corrective slice 2: validation provenance enforcement', () {
-      test(
-        'manual version edit without provenance fails validation',
-        () {
-          final tempDir = Directory.systemTemp.createTempSync('manual_edit_');
+      test('manual version edit without provenance fails validation', () {
+        final tempDir = Directory.systemTemp.createTempSync('manual_edit_');
 
-          Directory(
-            '${tempDir.path}/packages/explicit_outcome',
-          ).createSync(recursive: true);
+        Directory(
+          '${tempDir.path}/packages/explicit_outcome',
+        ).createSync(recursive: true);
 
-          // Simulate a manual version edit: pubspec says 0.5.0
-          // but no provenance was generated by the version-pr path.
-          File(
-            '${tempDir.path}/packages/explicit_outcome/pubspec.yaml',
-          ).writeAsStringSync('''
+        // Simulate a manual version edit: pubspec says 0.5.0
+        // but no provenance was generated by the version-pr path.
+        File(
+          '${tempDir.path}/packages/explicit_outcome/pubspec.yaml',
+        ).writeAsStringSync('''
 name: explicit_outcome
 version: 0.5.0
 description: Dart typed outcomes.
 ''');
 
-          File(
-            '${tempDir.path}/packages/explicit_outcome/CHANGELOG.md',
-          ).writeAsStringSync('''
+        File(
+          '${tempDir.path}/packages/explicit_outcome/CHANGELOG.md',
+        ).writeAsStringSync('''
 # Changelog
 
 ## 0.5.0 (2026-07-09)
@@ -1723,42 +1578,38 @@ description: Dart typed outcomes.
 - Manual version edit.
 ''');
 
-          Directory('${tempDir.path}/.changesets').createSync();
+        Directory('${tempDir.path}/.changesets').createSync();
 
-          final result = Process.runSync(
-            'dart',
-            [
-              'run',
-              'tool/release_changeset.dart',
-              'validate-release',
-              '--tag=explicit_outcome/v0.5.0',
-              '--workspace-root=${tempDir.path}',
-              '--changesets-dir=${tempDir.path}/.changesets',
-            ],
-          );
+        final result = Process.runSync('dart', [
+          'run',
+          'tool/release_changeset.dart',
+          'validate-release',
+          '--tag=explicit_outcome/v0.5.0',
+          '--workspace-root=${tempDir.path}',
+          '--changesets-dir=${tempDir.path}/.changesets',
+        ]);
 
-          expect(
-            result.exitCode,
-            isNot(0),
-            reason:
-                'Manual version edit without provenance must fail '
-                'closed.\nstdout: ${result.stdout}\n'
-                'stderr: ${result.stderr}',
-          );
+        expect(
+          result.exitCode,
+          isNot(0),
+          reason:
+              'Manual version edit without provenance must fail '
+              'closed.\nstdout: ${result.stdout}\n'
+              'stderr: ${result.stderr}',
+        );
 
-          final stdoutStr = result.stdout.toString().trim();
-          final decoded = jsonDecode(stdoutStr) as Map<String, dynamic>;
-          expect(decoded['isValid'], isFalse);
-          expect(
-            (decoded['errors'] as List<dynamic>).any(
-              (e) => e.toString().contains('provenance'),
-            ),
-            isTrue,
-          );
+        final stdoutStr = result.stdout.toString().trim();
+        final decoded = jsonDecode(stdoutStr) as Map<String, dynamic>;
+        expect(decoded['isValid'], isFalse);
+        expect(
+          (decoded['errors'] as List<dynamic>).any(
+            (e) => e.toString().contains('provenance'),
+          ),
+          isTrue,
+        );
 
-          tempDir.deleteSync(recursive: true);
-        },
-      );
+        tempDir.deleteSync(recursive: true);
+      });
     });
   });
 }

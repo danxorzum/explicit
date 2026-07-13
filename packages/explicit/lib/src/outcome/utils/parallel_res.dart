@@ -52,12 +52,8 @@ final class ParallelRes2<A extends Object, B extends Object, E extends Object> {
 /// Exceptions thrown by recipes propagate; this class does not catch, retry,
 /// or convert thrown errors.
 @experimental
-final class ParallelRes3<
-  A extends Object,
-  B extends Object,
-  C extends Object,
-  E extends Object
-> {
+final class ParallelRes3<A extends Object, B extends Object, C extends Object,
+    E extends Object> {
   /// Creates a parallel combinator for three [AsyncRes] recipes.
   const ParallelRes3(this.a, this.b, this.c);
 
@@ -101,13 +97,8 @@ final class ParallelRes3<
 /// Exceptions thrown by recipes propagate; this class does not catch, retry,
 /// or convert thrown errors.
 @experimental
-final class ParallelRes4<
-  A extends Object,
-  B extends Object,
-  C extends Object,
-  D extends Object,
-  E extends Object
-> {
+final class ParallelRes4<A extends Object, B extends Object, C extends Object,
+    D extends Object, E extends Object> {
   /// Creates a parallel combinator for four [AsyncRes] recipes.
   const ParallelRes4(this.a, this.b, this.c, this.d);
 
@@ -157,14 +148,8 @@ final class ParallelRes4<
 /// Exceptions thrown by recipes propagate; this class does not catch, retry,
 /// or convert thrown errors.
 @experimental
-final class ParallelRes5<
-  A extends Object,
-  B extends Object,
-  C extends Object,
-  D extends Object,
-  F extends Object,
-  E extends Object
-> {
+final class ParallelRes5<A extends Object, B extends Object, C extends Object,
+    D extends Object, F extends Object, E extends Object> {
   /// Creates a parallel combinator for five [AsyncRes] recipes.
   const ParallelRes5(this.a, this.b, this.c, this.d, this.e);
 

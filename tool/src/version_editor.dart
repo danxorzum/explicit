@@ -360,10 +360,8 @@ class VersionEditor {
                   'readme.md',
             )
             .map(
-              (f) => _ChangesetFile(
-                path: f.path,
-                content: f.readAsStringSync(),
-              ),
+              (f) =>
+                  _ChangesetFile(path: f.path, content: f.readAsStringSync()),
             )
             .toList()
           ..sort((a, b) => a.path.compareTo(b.path));

@@ -42,10 +42,12 @@ Future<void> main(List<String> args) async {
 
     // Run Pana from the workspace root with JSON output. Pana is a root
     // dev_dependency so CI and local runs do not depend on global activation.
-    final panaResult = await Process.run(
-      'dart',
-      ['run', 'pana', '--json', packageDir],
-    );
+    final panaResult = await Process.run('dart', [
+      'run',
+      'pana',
+      '--json',
+      packageDir,
+    ]);
 
     if (panaResult.exitCode != 0) {
       stderr

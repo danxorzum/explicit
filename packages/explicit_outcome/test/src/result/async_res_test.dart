@@ -106,14 +106,13 @@ void main() {
   group('AsyncRes.map', () {
     test('is lazy and transforms Ok values in declaration order', () async {
       final events = <String>[];
-      final mapped =
-          AsyncRes<int, String>(() async {
-            events.add('operation');
-            return const Ok(20);
-          }).map((value) {
-            events.add('map');
-            return value + 22;
-          });
+      final mapped = AsyncRes<int, String>(() async {
+        events.add('operation');
+        return const Ok(20);
+      }).map((value) {
+        events.add('map');
+        return value + 22;
+      });
 
       expect(events, isEmpty);
 
@@ -125,19 +124,16 @@ void main() {
 
     test('composes multiple map steps in declaration order', () async {
       final events = <String>[];
-      final mapped =
-          AsyncRes<int, String>(() async {
-                events.add('operation');
-                return const Ok(10);
-              })
-              .map((value) {
-                events.add('map:double');
-                return value * 2;
-              })
-              .map((value) {
-                events.add('map:add');
-                return value + 22;
-              });
+      final mapped = AsyncRes<int, String>(() async {
+        events.add('operation');
+        return const Ok(10);
+      }).map((value) {
+        events.add('map:double');
+        return value * 2;
+      }).map((value) {
+        events.add('map:add');
+        return value + 22;
+      });
 
       final result = await mapped.run();
 
@@ -147,14 +143,13 @@ void main() {
 
     test('short-circuits Err without calling transform', () async {
       final events = <String>[];
-      final mapped =
-          AsyncRes<int, String>(() async {
-            events.add('operation');
-            return const Err('boom');
-          }).map<int>((value) {
-            events.add('map');
-            return -1;
-          });
+      final mapped = AsyncRes<int, String>(() async {
+        events.add('operation');
+        return const Err('boom');
+      }).map<int>((value) {
+        events.add('map');
+        return -1;
+      });
 
       final result = await mapped.run();
 
@@ -177,17 +172,16 @@ void main() {
   group('AsyncRes.next', () {
     test('chains Ok values lazily in declaration order', () async {
       final events = <String>[];
-      final chained =
-          AsyncRes<int, String>(() async {
-            events.add('first');
-            return const Ok(20);
-          }).next((value) {
-            events.add('build second:$value');
-            return AsyncRes<int, String>(() async {
-              events.add('second');
-              return Ok(value + 22);
-            });
-          });
+      final chained = AsyncRes<int, String>(() async {
+        events.add('first');
+        return const Ok(20);
+      }).next((value) {
+        events.add('build second:$value');
+        return AsyncRes<int, String>(() async {
+          events.add('second');
+          return Ok(value + 22);
+        });
+      });
 
       expect(events, isEmpty);
 
@@ -199,16 +193,15 @@ void main() {
 
     test('chains Ok to Err through next callback', () async {
       final events = <String>[];
-      final chained =
-          AsyncRes<int, String>(() async {
-            events.add('first');
-            return const Ok(0);
-          }).next((value) {
-            events.add('build second:$value');
-            return AsyncRes<int, String>(
-              () async => const Err('zero is invalid'),
-            );
-          });
+      final chained = AsyncRes<int, String>(() async {
+        events.add('first');
+        return const Ok(0);
+      }).next((value) {
+        events.add('build second:$value');
+        return AsyncRes<int, String>(
+          () async => const Err('zero is invalid'),
+        );
+      });
 
       final result = await chained.run();
 
@@ -218,17 +211,16 @@ void main() {
 
     test('short-circuits Err without building the next AsyncRes', () async {
       final events = <String>[];
-      final chained =
-          AsyncRes<int, String>(() async {
-            events.add('first');
-            return const Err('boom');
-          }).next<int>((value) {
-            events.add('build second');
-            return AsyncRes<int, String>(() async {
-              events.add('second');
-              return const Ok(0);
-            });
-          });
+      final chained = AsyncRes<int, String>(() async {
+        events.add('first');
+        return const Err('boom');
+      }).next<int>((value) {
+        events.add('build second');
+        return AsyncRes<int, String>(() async {
+          events.add('second');
+          return const Ok(0);
+        });
+      });
 
       final result = await chained.run();
 
@@ -238,12 +230,11 @@ void main() {
 
     test('propagates exceptions thrown by the next callback', () async {
       final error = StateError('next failed');
-      final throwing =
-          AsyncRes<int, String>(
-            () async => const Ok(1),
-          ).next<int>((_) {
-            throw error;
-          });
+      final throwing = AsyncRes<int, String>(
+        () async => const Ok(1),
+      ).next<int>((_) {
+        throw error;
+      });
 
       await expectLater(throwing.run(), throwsA(same(error)));
     });
@@ -252,14 +243,13 @@ void main() {
   group('AsyncRes.mapError', () {
     test('preserves Ok values without running the callback', () async {
       final events = <String>[];
-      final mapped =
-          AsyncRes<int, String>(() async {
-            events.add('operation');
-            return const Ok(42);
-          }).mapError((error) {
-            events.add('unexpected:$error');
-            return error.length;
-          });
+      final mapped = AsyncRes<int, String>(() async {
+        events.add('operation');
+        return const Ok(42);
+      }).mapError((error) {
+        events.add('unexpected:$error');
+        return error.length;
+      });
 
       final result = await mapped.run();
 
@@ -269,14 +259,13 @@ void main() {
 
     test('transforms Err error values', () async {
       final events = <String>[];
-      final mapped =
-          AsyncRes<int, String>(() async {
-            events.add('operation');
-            return const Err('timeout');
-          }).mapError((error) {
-            events.add('mapError:$error');
-            return 'network:$error';
-          });
+      final mapped = AsyncRes<int, String>(() async {
+        events.add('operation');
+        return const Err('timeout');
+      }).mapError((error) {
+        events.add('mapError:$error');
+        return 'network:$error';
+      });
 
       final result = await mapped.run();
 
@@ -286,12 +275,11 @@ void main() {
 
     test('propagates exceptions thrown by the error transform', () async {
       final error = StateError('mapError failed');
-      final throwing =
-          AsyncRes<int, String>(
-            () async => const Err('boom'),
-          ).mapError<String>((_) {
-            throw error;
-          });
+      final throwing = AsyncRes<int, String>(
+        () async => const Err('boom'),
+      ).mapError<String>((_) {
+        throw error;
+      });
 
       await expectLater(throwing.run(), throwsA(same(error)));
     });
@@ -300,14 +288,13 @@ void main() {
   group('AsyncRes.or', () {
     test('returns Ok without evaluating fallback', () async {
       final events = <String>[];
-      final res =
-          AsyncRes<int, String>(() async {
-            events.add('operation');
-            return const Ok(42);
-          }).or((error) {
-            events.add('unexpected:$error');
-            return AsyncRes<int, String>(() async => Ok(error.length));
-          });
+      final res = AsyncRes<int, String>(() async {
+        events.add('operation');
+        return const Ok(42);
+      }).or((error) {
+        events.add('unexpected:$error');
+        return AsyncRes<int, String>(() async => Ok(error.length));
+      });
 
       final result = await res.run();
 
@@ -317,17 +304,16 @@ void main() {
 
     test('evaluates fallback for Err and can recover to Ok', () async {
       final events = <String>[];
-      final res =
-          AsyncRes<int, String>(() async {
-            events.add('operation');
-            return const Err('timeout');
-          }).or((error) {
-            events.add('build fallback:$error');
-            return AsyncRes<int, String>(() async {
-              events.add('fallback');
-              return Ok(error.length);
-            });
-          });
+      final res = AsyncRes<int, String>(() async {
+        events.add('operation');
+        return const Err('timeout');
+      }).or((error) {
+        events.add('build fallback:$error');
+        return AsyncRes<int, String>(() async {
+          events.add('fallback');
+          return Ok(error.length);
+        });
+      });
 
       final result = await res.run();
 
@@ -337,16 +323,15 @@ void main() {
 
     test('evaluates fallback for Err and can remain Err', () async {
       final events = <String>[];
-      final res =
-          AsyncRes<int, String>(() async {
-            events.add('operation');
-            return const Err('timeout');
-          }).or((error) {
-            events.add('build fallback:$error');
-            return AsyncRes<int, String>(
-              () async => Err('recovered:$error'),
-            );
-          });
+      final res = AsyncRes<int, String>(() async {
+        events.add('operation');
+        return const Err('timeout');
+      }).or((error) {
+        events.add('build fallback:$error');
+        return AsyncRes<int, String>(
+          () async => Err('recovered:$error'),
+        );
+      });
 
       final result = await res.run();
 
@@ -356,12 +341,11 @@ void main() {
 
     test('propagates exceptions thrown by the fallback', () async {
       final error = StateError('fallback failed');
-      final throwing =
-          AsyncRes<int, String>(
-            () async => const Err('boom'),
-          ).or((_) {
-            throw error;
-          });
+      final throwing = AsyncRes<int, String>(
+        () async => const Err('boom'),
+      ).or((_) {
+        throw error;
+      });
 
       await expectLater(throwing.run(), throwsA(same(error)));
     });
