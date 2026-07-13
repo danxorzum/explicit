@@ -75,16 +75,28 @@ jobs:
 
       - name: Render release plan
         if: steps.diff_context.outputs.base_sha != ''
+        id: render_plan
         run: |
           echo "=== Release Plan ==="
-          dart run tool/release_changeset.dart plan --format=markdown \
+          PLAN_MD=$(dart run tool/release_changeset.dart plan --format=markdown \
             --base=${{ steps.diff_context.outputs.base_sha }} \
-            --head=${{ steps.diff_context.outputs.head_sha }}
+            --head=${{ steps.diff_context.outputs.head_sha }})
+          echo "$PLAN_MD"
           echo ""
           echo "=== JSON Plan (for PR body) ==="
-          dart run tool/release_changeset.dart plan --format=json \
+          PLAN_JSON=$(dart run tool/release_changeset.dart plan --format=json \
             --base=${{ steps.diff_context.outputs.base_sha }} \
-            --head=${{ steps.diff_context.outputs.head_sha }}
+            --head=${{ steps.diff_context.outputs.head_sha }})
+          echo "$PLAN_JSON"
+          
+          # Save outputs for later use (before version-pr deletes changesets)
+          echo "plan_md<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$PLAN_MD" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          
+          echo "plan_json<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$PLAN_JSON" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Skip release plan (no diff context)
         if: steps.diff_context.outputs.base_sha == ''
@@ -97,9 +109,7 @@ jobs:
         id: check_candidates
         if: steps.diff_context.outputs.base_sha != ''
         run: |
-          PLAN_JSON=$(dart run tool/release_changeset.dart plan --format=json \
-            --base=${{ steps.diff_context.outputs.base_sha }} \
-            --head=${{ steps.diff_context.outputs.head_sha }})
+          PLAN_JSON='${{ steps.render_plan.outputs.plan_json }}'
           CANDIDATE_COUNT=$(echo "$PLAN_JSON" | python3 -c "import sys, json; print(len(json.load(sys.stdin)['candidates']))")
           echo "candidate_count=$CANDIDATE_COUNT" >> "$GITHUB_OUTPUT"
           if [ "$CANDIDATE_COUNT" -eq 0 ]; then
@@ -128,9 +138,7 @@ jobs:
         id: pr_body
         run: |
           PR_BODY_FILE="$RUNNER_TEMP/release-version-pr-body.md"
-          PLAN_MD=$(dart run tool/release_changeset.dart plan --format=markdown \
-            --base=${{ steps.diff_context.outputs.base_sha }} \
-            --head=${{ steps.diff_context.outputs.head_sha }})
+          PLAN_MD='${{ steps.render_plan.outputs.plan_md }}'
           {
             printf '%s\n' "$PLAN_MD"
             printf '\n---\n\n'
