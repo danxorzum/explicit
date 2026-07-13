@@ -304,6 +304,44 @@ explicit: patch
         tempDir.deleteSync(recursive: true);
       });
 
+      test(
+        'tooling workflow only diff does not require package changesets',
+        () {
+          final tempDir = Directory.systemTemp.createTempSync(
+            'changeset_test_',
+          );
+          final changesetsDir = Directory('${tempDir.path}/.changesets')
+            ..createSync();
+
+          final result = Process.runSync(
+            'dart',
+            [
+              'run',
+              'tool/release_changeset.dart',
+              'plan',
+              '--format=json',
+              '--changed-files=${[
+                '.changesets/README.md',
+                '.github/PULL_REQUEST_TEMPLATE.md',
+                '.github/workflows/release_version_pr.yaml',
+                'pubspec.yaml',
+                'tool/release_changeset.dart',
+                'tool/src/release_planner.dart',
+                'tool/test/release_planner_test.dart',
+              ].join(',')}',
+              '--changesets-dir=${changesetsDir.path}',
+            ],
+          );
+
+          expect(result.exitCode, 0, reason: result.stderr.toString());
+          final decoded =
+              jsonDecode(result.stdout.toString()) as Map<String, dynamic>;
+          expect(decoded['candidates'], isEmpty);
+
+          tempDir.deleteSync(recursive: true);
+        },
+      );
+
       test('ignores README but not arbitrary template-like filenames', () {
         final tempDir = Directory.systemTemp.createTempSync('changeset_test_');
         final changesetsDir = Directory('${tempDir.path}/.changesets')

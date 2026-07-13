@@ -5,10 +5,10 @@ name: Release Version PR
 # real package impact.
 #
 # DIFF CONTEXT: Every plan and version-pr invocation receives --base/--head.
-# The base is the last release version PR merge commit, falling back to the root
-# commit before the first release version PR exists. It intentionally does not
-# use package release tags because a latest global tag can hide unreleased
-# changesets for another package.
+# The base is the last release version PR merge commit, falling back to the
+# current push's before SHA when no release PR has merged yet. It intentionally
+# does not use package release tags because a latest global tag can hide
+# unreleased changesets for another package.
 #
 # This workflow does NOT publish and never creates release tags. After this PR
 # is merged and CI is green, the maintainer manually creates and pushes the
@@ -49,6 +49,7 @@ jobs:
         id: diff_context
         run: |
           HEAD_SHA="${{ github.event.after }}"
+          PUSH_BEFORE_SHA="${{ github.event.before }}"
           BASE_SHA=""
 
           LAST_RELEASE_COMMIT=$(git log --oneline --grep="chore(release): prepare package versions" -1 --format="%H" main 2>/dev/null || echo "")
@@ -58,10 +59,9 @@ jobs:
           fi
 
           if [ -z "$BASE_SHA" ]; then
-            ROOT_COMMIT=$(git rev-list --max-parents=0 HEAD 2>/dev/null | tail -1 || echo "")
-            if [ -n "$ROOT_COMMIT" ]; then
-              BASE_SHA="$ROOT_COMMIT"
-              echo "Diff context: using repository root '$ROOT_COMMIT' as conservative base."
+            if [ -n "$PUSH_BEFORE_SHA" ] && [ "$PUSH_BEFORE_SHA" != "0000000000000000000000000000000000000000" ] && git cat-file -e "$PUSH_BEFORE_SHA^{commit}" 2>/dev/null; then
+              BASE_SHA="$PUSH_BEFORE_SHA"
+              echo "Diff context: using push before SHA '$PUSH_BEFORE_SHA' as base."
             fi
           fi
 

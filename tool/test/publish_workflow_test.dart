@@ -327,7 +327,7 @@ void main() {
       );
     });
 
-    test('diff context uses version PR merge or conservative root base', () {
+    test('diff context uses version PR merge or push before SHA', () {
       final diffStep = _workflowStepSection(
         versionPrYaml,
         'Compute diff context',
@@ -338,17 +338,18 @@ void main() {
         allOf([
           contains('chore(release): prepare package versions'),
           contains('LAST_RELEASE_COMMIT'),
-          contains('git rev-list --max-parents=0 HEAD'),
-          contains('conservative base'),
+          contains('PUSH_BEFORE_SHA'),
+          contains('using push before SHA'),
         ]),
         reason:
             'The release version PR range must start from the last version PR '
-            'baseline, or from the repository root before such a baseline '
-            'exists, so package-specific unreleased changes cannot be hidden.',
+            'baseline, or from the current push before SHA before such a '
+            'baseline exists, so historical package files are not treated as '
+            'current release impact.',
       );
     });
 
-    test('diff context does not fall back to push before SHA', () {
+    test('diff context does not fall back to repository root', () {
       final diffStep = _workflowStepSection(
         versionPrYaml,
         'Compute diff context',
@@ -356,10 +357,10 @@ void main() {
 
       expect(
         diffStep,
-        isNot(contains('github.event.before')),
+        isNot(contains('git rev-list --max-parents=0 HEAD')),
         reason:
-            'A push-local before SHA can miss unreleased changes from earlier '
-            'pushes; use the release PR baseline or a conservative root base.',
+            'Root fallback reclassifies historical package files as current '
+            'release impact and incorrectly requires changesets.',
       );
     });
 
@@ -552,6 +553,28 @@ void main() {
         );
       },
     );
+
+    test('initial release PR diff context uses push before SHA, not root', () {
+      final diffContextStep = _workflowStepSection(
+        versionPrYaml,
+        'Compute diff context',
+      );
+
+      expect(
+        diffContextStep,
+        contains('PUSH_BEFORE_SHA'),
+        reason:
+            'Before the first version PR exists, push workflows must compare '
+            'only the current push instead of the entire repository history.',
+      );
+      expect(
+        diffContextStep,
+        isNot(contains('rev-list --max-parents=0')),
+        reason:
+            'Root fallback reclassifies historical package files as current '
+            'release impact and incorrectly requires changesets.',
+      );
+    });
 
     test('version PR workflow never creates or pushes release tags', () {
       expect(versionPrYaml, isNot(contains('create-tags')));
