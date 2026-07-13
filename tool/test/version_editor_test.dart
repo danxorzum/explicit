@@ -407,10 +407,7 @@ dependencies:
       });
 
       test('produces no edits when plan has no candidates', () {
-        const plan = ReleasePlan(
-          candidates: [],
-          dependencyUpdates: [],
-        );
+        const plan = ReleasePlan(candidates: [], dependencyUpdates: []);
 
         final edits = VersionEditor.applyVersionEdits(plan, tempDir.path);
         expect(edits, isEmpty);
@@ -518,14 +515,14 @@ explicit_outcome: patch
 
 - Fix edge case.
 ''';
-        File('${changesetsDir.path}/fix.md').writeAsStringSync(
-          changesetContent,
-        );
+        File(
+          '${changesetsDir.path}/fix.md',
+        ).writeAsStringSync(changesetContent);
 
         // Run twice — should produce identical provenance.
-        File('${changesetsDir.path}/fix.md').writeAsStringSync(
-          changesetContent,
-        );
+        File(
+          '${changesetsDir.path}/fix.md',
+        ).writeAsStringSync(changesetContent);
 
         VersionEditor.applyVersionEdits(
           plan,
@@ -544,9 +541,9 @@ name: explicit_outcome
 version: 0.0.1
 description: Dart typed outcomes.
 ''');
-        File('${changesetsDir.path}/fix.md').writeAsStringSync(
-          changesetContent,
-        );
+        File(
+          '${changesetsDir.path}/fix.md',
+        ).writeAsStringSync(changesetContent);
 
         VersionEditor.applyVersionEdits(
           plan,
@@ -703,9 +700,9 @@ explicit_outcome: patch
 
 - Fix.
 ''';
-          File('${changesetsDir.path}/fix.md').writeAsStringSync(
-            changesetContent,
-          );
+          File(
+            '${changesetsDir.path}/fix.md',
+          ).writeAsStringSync(changesetContent);
 
           VersionEditor.applyVersionEdits(
             plan,
@@ -752,9 +749,7 @@ explicit_outcome: patch
         final outcomeEdits = edits.where(
           (e) => e.packageName == 'explicit_outcome',
         );
-        final explicitEdits = edits.where(
-          (e) => e.packageName == 'explicit',
-        );
+        final explicitEdits = edits.where((e) => e.packageName == 'explicit');
         expect(outcomeEdits, isNotEmpty);
         expect(explicitEdits, isNotEmpty);
         // Outcome edits come before explicit edits in the list.
@@ -889,9 +884,9 @@ explicit_outcome: patch
 
 - Fix.
 ''';
-        File('${changesetsDir.path}/fix.md').writeAsStringSync(
-          changesetContent,
-        );
+        File(
+          '${changesetsDir.path}/fix.md',
+        ).writeAsStringSync(changesetContent);
 
         // Run twice — provenance should be identical.
         VersionEditor.applyVersionEdits(
@@ -912,9 +907,9 @@ name: explicit_outcome
 version: 0.0.1
 description: Dart typed outcomes.
 ''');
-        File('${changesetsDir.path}/fix.md').writeAsStringSync(
-          changesetContent,
-        );
+        File(
+          '${changesetsDir.path}/fix.md',
+        ).writeAsStringSync(changesetContent);
 
         VersionEditor.applyVersionEdits(
           plan,

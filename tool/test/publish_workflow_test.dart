@@ -271,9 +271,7 @@ void main() {
     setUpAll(() {
       final file = File('.github/workflows/release_version_pr.yaml');
       if (!file.existsSync()) {
-        fail(
-          'release_version_pr.yaml not found',
-        );
+        fail('release_version_pr.yaml not found');
       }
       versionPrYaml = file.readAsStringSync();
     });
@@ -426,35 +424,32 @@ void main() {
       }
     });
 
-    test(
-      'no stale release-transfer language in PR body or comments',
-      () {
-        // The corrected contract: the maintainer manually creates tags after
-        // the version PR merges and CI is green.
-        const staleTransferTerm =
-            'hand'
-            'off';
-        expect(
-          versionPrYaml,
-          isNot(contains('tags will be created manually')),
-          reason: 'Use current manual tag wording instead of stale phrasing.',
-        );
-        expect(
-          versionPrYaml.toLowerCase(),
-          isNot(contains(staleTransferTerm)),
-          reason:
-              'Release workflow logs and PR body must not describe a manual '
-              'transfer step.',
-        );
-        expect(
-          versionPrYaml,
-          contains(
-            'maintainer manually creates and pushes validated release tags',
-          ),
-          reason: 'Workflow logs must describe the corrected manual tag flow.',
-        );
-      },
-    );
+    test('no stale release-transfer language in PR body or comments', () {
+      // The corrected contract: the maintainer manually creates tags after
+      // the version PR merges and CI is green.
+      const staleTransferTerm =
+          'hand'
+          'off';
+      expect(
+        versionPrYaml,
+        isNot(contains('tags will be created manually')),
+        reason: 'Use current manual tag wording instead of stale phrasing.',
+      );
+      expect(
+        versionPrYaml.toLowerCase(),
+        isNot(contains(staleTransferTerm)),
+        reason:
+            'Release workflow logs and PR body must not describe a manual '
+            'transfer step.',
+      );
+      expect(
+        versionPrYaml,
+        contains(
+          'maintainer manually creates and pushes validated release tags',
+        ),
+        reason: 'Workflow logs must describe the corrected manual tag flow.',
+      );
+    });
 
     test('check_candidates step passes --base and --head to plan', () {
       // The check_candidates step invokes plan internally to count
@@ -490,21 +485,18 @@ void main() {
       );
     });
 
-    test(
-      'downstream steps are gated on diff context availability',
-      () {
-        // Steps that invoke plan/version-pr must have an `if:` condition
-        // that checks base_sha is non-empty, ensuring fail-closed behavior
-        // when no safe diff range can be computed.
-        expect(
-          versionPrYaml,
-          contains("steps.diff_context.outputs.base_sha != ''"),
-          reason:
-              'Steps requiring diff context must be gated on '
-              'base_sha being non-empty (fail-closed)',
-        );
-      },
-    );
+    test('downstream steps are gated on diff context availability', () {
+      // Steps that invoke plan/version-pr must have an `if:` condition
+      // that checks base_sha is non-empty, ensuring fail-closed behavior
+      // when no safe diff range can be computed.
+      expect(
+        versionPrYaml,
+        contains("steps.diff_context.outputs.base_sha != ''"),
+        reason:
+            'Steps requiring diff context must be gated on '
+            'base_sha being non-empty (fail-closed)',
+      );
+    });
 
     test(
       'version-edit downstream steps require candidates and diff context',
@@ -539,20 +531,17 @@ void main() {
       },
     );
 
-    test(
-      'fail-closed message is logged when no diff context available',
-      () {
-        // When no safe base is found, the workflow should log a clear
-        // fail-closed message rather than silently proceeding.
-        expect(
-          versionPrYaml,
-          contains('FAIL CLOSED'),
-          reason:
-              'Workflow must log fail-closed when no safe diff '
-              'context is available',
-        );
-      },
-    );
+    test('fail-closed message is logged when no diff context available', () {
+      // When no safe base is found, the workflow should log a clear
+      // fail-closed message rather than silently proceeding.
+      expect(
+        versionPrYaml,
+        contains('FAIL CLOSED'),
+        reason:
+            'Workflow must log fail-closed when no safe diff '
+            'context is available',
+      );
+    });
 
     test('initial release PR diff context uses push before SHA, not root', () {
       final diffContextStep = _workflowStepSection(
@@ -623,9 +612,7 @@ void main() {
       expect(
         generateBodyStep,
         allOf([
-          contains(
-            r'PR_BODY_FILE="$RUNNER_TEMP/release-version-pr-body.md"',
-          ),
+          contains(r'PR_BODY_FILE="$RUNNER_TEMP/release-version-pr-body.md"'),
           contains(r'} > "$PR_BODY_FILE"'),
         ]),
         reason:

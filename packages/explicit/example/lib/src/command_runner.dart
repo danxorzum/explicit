@@ -9,7 +9,7 @@ import 'package:explicit/explicit.dart';
 class ExplicitExampleCommandRunner extends CompletionCommandRunner<int> {
   /// Creates the command runner.
   ExplicitExampleCommandRunner()
-    : super('explicit_example', 'Example command-line app for explicit.') {
+      : super('explicit_example', 'Example command-line app for explicit.') {
     argParser.addOption(
       'name',
       abbr: 'n',
