@@ -1,5 +1,5 @@
 name: explicit
-description: Declarative Dart utilities for explicit, predictable development with typed outcomes.
+description: A compact library for explicit, predictable, and readable Dart.
 version: 0.0.2
 license: MPL-2.0
 homepage: https://github.com/danxorzum/explicit/tree/main/packages/explicit

@@ -10,5 +10,9 @@ dependencies:
   explicit:
     path: ../
 
+dependency_overrides:
+  explicit_outcome:
+    path: ../../explicit_outcome
+
 dev_dependencies:
   very_good_analysis: ^7.0.0
