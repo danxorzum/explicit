@@ -7,8 +7,6 @@ void main() {
     group('assertSafeContent (default — no workflow/job context)', () {
       test('passes for safe content with no forbidden commands', () {
         const safeContent = '''
-// This is a safe publish simulation
-stdout.writeln('SIMULATION ONLY: would publish package');
 stdout.writeln('dart pub publish --dry-run');
 ''';
         final result = PublishSafety.assertSafeContent(safeContent);
@@ -105,14 +103,6 @@ dart pub publish -n
         expect(result.violations, isEmpty);
       });
 
-      test('allows SIMULATION ONLY strings', () {
-        const safeContent = '''
-stdout.writeln('SIMULATION ONLY: would publish explicit_outcome 0.0.1');
-''';
-        final result = PublishSafety.assertSafeContent(safeContent);
-        expect(result.isSafe, isTrue);
-      });
-
       test('detects --force in different contexts', () {
         const unsafeContent = '''
 Process.run('dart', ['pub', 'publish', '--force'], ...);
@@ -203,19 +193,6 @@ permissions:
           content,
           workflow: 'ci.yaml',
           job: 'quality_gate',
-        );
-        expect(result.isSafe, isFalse);
-      });
-
-      test('denies id-token: write in publish_simulation.yaml', () {
-        const content = '''
-permissions:
-  id-token: write
-''';
-        final result = PublishSafety.assertSafeContent(
-          content,
-          workflow: 'publish_simulation.yaml',
-          job: 'publish_simulation',
         );
         expect(result.isSafe, isFalse);
       });

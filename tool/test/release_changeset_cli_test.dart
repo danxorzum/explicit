@@ -739,7 +739,7 @@ explicit_outcome: minor
               '- Add typed outcome API.',
             ),
             'tag': 'explicit_outcome/v0.1.0',
-            'releaseAutomation': ReleaseProvenance.expectedReleaseAutomation,
+            'provenanceSource': ReleaseProvenance.expectedProvenanceSource,
           }),
         );
 
@@ -897,7 +897,7 @@ explicit_outcome: minor
               '- Add typed outcome API.',
             ),
             'tag': 'explicit_outcome/v0.1.0',
-            'releaseAutomation': ReleaseProvenance.expectedReleaseAutomation,
+            'provenanceSource': ReleaseProvenance.expectedProvenanceSource,
           }),
         );
 

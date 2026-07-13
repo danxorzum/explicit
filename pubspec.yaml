@@ -66,13 +66,6 @@ melos:
         dart run melos exec --concurrency 1 --fail-fast --
         "dart pub publish --dry-run"
 
-    publish:simulate:
-      description: >
-        Run safe no-op publish simulation for explicitly selected publish
-        candidates. Never expands dependents for publication and never executes
-        real publish. Usage: melos run publish:simulate -- --packages=explicit_outcome
-      run: dart run tool/publish_simulation.dart
-
     hooks:install:
       description: >
         Install or update the pre-push quality gate hook.

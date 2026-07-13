@@ -427,7 +427,7 @@ class ReleasePlanner {
 }
 
 // ---------------------------------------------------------------------------
-// Provenance, tag validation, preflight, and major detection
+// Provenance, tag validation, and preflight
 // ---------------------------------------------------------------------------
 
 /// Release provenance manifest committed during version-pr.
@@ -445,7 +445,7 @@ class ReleaseProvenance {
     required this.changesetHashes,
     required this.changelogNotesHash,
     required this.tag,
-    this.releaseAutomation = expectedReleaseAutomation,
+    this.provenanceSource = expectedProvenanceSource,
     this.changesetContents = const [],
     this.impactProof = const [],
   });
@@ -479,7 +479,7 @@ class ReleaseProvenance {
     final impactProof = decoded['impactProof'] as List<dynamic>?;
     final notesHash = decoded['changelogNotesHash'] as String?;
     final tag = decoded['tag'] as String?;
-    final releaseAutomation = decoded['releaseAutomation'] as String?;
+    final provenanceSource = decoded['provenanceSource'] as String?;
 
     if (pkg == null ||
         ver == null ||
@@ -489,11 +489,11 @@ class ReleaseProvenance {
         hashes == null ||
         notesHash == null ||
         tag == null ||
-        releaseAutomation == null) {
+        provenanceSource == null) {
       throw const FormatException(
         'Provenance manifest is missing required fields '
         '(package, version, previousVersion, nextVersion, bump, '
-        'changesetHashes, changelogNotesHash, tag, releaseAutomation).',
+        'changesetHashes, changelogNotesHash, tag, provenanceSource).',
       );
     }
 
@@ -508,12 +508,12 @@ class ReleaseProvenance {
       impactProof: impactProof?.cast<String>() ?? const [],
       changelogNotesHash: notesHash,
       tag: tag,
-      releaseAutomation: releaseAutomation,
+      provenanceSource: provenanceSource,
     );
   }
 
-  /// Required automation identity for release provenance emitted by version-pr.
-  static const String expectedReleaseAutomation =
+  /// Required provenance source emitted by the version PR workflow.
+  static const String expectedProvenanceSource =
       'release_version_pr.version-pr.v1';
 
   /// Package name this provenance belongs to.
@@ -556,8 +556,8 @@ class ReleaseProvenance {
   /// Intended release tag (e.g., explicit_outcome/v0.1.0).
   final String tag;
 
-  /// Release automation path that is allowed to create and push this tag.
-  final String releaseAutomation;
+  /// Workflow source that prepared this provenance for manual tag publishing.
+  final String provenanceSource;
 
   /// Serializes provenance to deterministic JSON.
   String toJson() {
@@ -572,7 +572,7 @@ class ReleaseProvenance {
       'impactProof': impactProof,
       'changelogNotesHash': changelogNotesHash,
       'tag': tag,
-      'releaseAutomation': releaseAutomation,
+      'provenanceSource': provenanceSource,
     };
     return const JsonEncoder.withIndent('  ').convert(data);
   }
@@ -831,12 +831,12 @@ class ReleaseValidator {
         );
       }
 
-      if (provenance.releaseAutomation !=
-          ReleaseProvenance.expectedReleaseAutomation) {
+      if (provenance.provenanceSource !=
+          ReleaseProvenance.expectedProvenanceSource) {
         errors.add(
-          'Provenance releaseAutomation "${provenance.releaseAutomation}" '
-          'does not match the approved automation path '
-          '"${ReleaseProvenance.expectedReleaseAutomation}".',
+          'Provenance source "${provenance.provenanceSource}" '
+          'does not match the approved version PR source '
+          '"${ReleaseProvenance.expectedProvenanceSource}".',
         );
       }
 
@@ -887,16 +887,11 @@ class ReleaseValidator {
         errors: errors,
       );
 
-      // Extract provenance bump for major detection.
+      // Extract provenance bump for release metadata.
       provenanceBump = provenance.bump;
     }
 
-    // Detect major release using provenance bump (primary source).
-    final isMajor = MajorDetector.isMajorRelease(
-      tagVersion: tagInfo.version,
-      pubspecContent: pubspecContent,
-      provenanceBump: provenanceBump,
-    );
+    final isMajor = provenanceBump == 'major';
 
     // Run dependency preflight for `explicit` package.
     if (tagInfo.packageName == 'explicit' && metadataFetcher != null) {
@@ -1105,29 +1100,6 @@ class ReleaseValidator {
     if (nextMinor > prevMinor) return 'minor';
 
     return 'patch';
-  }
-}
-
-/// Detects whether a release tag represents a major version bump.
-///
-/// Detection uses the provenance `bump` field committed during version-pr.
-/// Without provenance, validation fails closed and this detector does not
-/// infer release class from weaker tag/pubspec state.
-class MajorDetector {
-  /// Returns true if the release is a major version bump.
-  ///
-  /// When [provenanceBump] is provided, uses it directly:
-  /// `major` → true, anything else → false.
-  static bool isMajorRelease({
-    required String tagVersion,
-    required String pubspecContent,
-    String? provenanceBump,
-  }) {
-    if (provenanceBump != null) {
-      return provenanceBump == 'major';
-    }
-
-    return false;
   }
 }
 

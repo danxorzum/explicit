@@ -660,30 +660,6 @@ void main() {
       expect(ciYaml, isNot(contains('pub publish')));
     });
   });
-
-  group('publish_simulation.yaml regression', () {
-    late String simYaml;
-
-    setUpAll(() {
-      final file = File('.github/workflows/publish_simulation.yaml');
-      if (!file.existsSync()) {
-        fail('publish_simulation.yaml not found');
-      }
-      simYaml = file.readAsStringSync();
-    });
-
-    test('no id-token: write permission', () {
-      expect(simYaml, isNot(contains('id-token: write')));
-    });
-
-    test('no dart pub publish --force', () {
-      expect(simYaml, isNot(contains('publish --force')));
-    });
-
-    test('no melos publish --no-dry-run', () {
-      expect(simYaml, isNot(contains('--no-dry-run')));
-    });
-  });
 }
 
 String _withoutYamlComments(String yaml) => yaml

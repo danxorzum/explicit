@@ -3,7 +3,7 @@ enum GateMode {
   /// Pull request / branch mode: validate affected packages only.
   pr,
 
-  /// Validate all packages (main branch, publish simulation).
+  /// Validate all packages (main branch and full local checks).
   all,
 
   /// Pre-push hook mode: validate affected packages.

@@ -178,9 +178,6 @@ class PublishSafety {
       return false;
     }
 
-    // Exclude SIMULATION ONLY strings.
-    if (trimmed.contains('SIMULATION ONLY')) return false;
-
     return true;
   }
 

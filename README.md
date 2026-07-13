@@ -359,7 +359,7 @@ melos run hooks:install -- --uninstall
 Contributions are welcome. This repository uses the following automation and conventions:
 
 - **CI** ([`ci.yaml`][ci_link]): runs strict quality gates (format, analyze, tests, 100% coverage) on every push and pull request to `main`, plus semantic PR title checks.
-- **Publish simulation** ([`publish_simulation.yaml`]): validates publish readiness with dry-run, Pana gates, and no-op simulation — never publishes to pub.dev. Publish candidates are explicit; validating a dependent package does not automatically make it a release candidate.
+- **Release version PR** ([`release_version_pr.yaml`]): prepares version, changelog, and provenance updates from explicit changesets. Maintainers manually create release tags after the version PR merges and CI is green.
 - **Dependabot** ([`dependabot.yaml`]): opens daily pull requests for outdated GitHub Actions and pub dependencies.
 - **Issue-first policy** ([`issue_first.yaml`]): automatically closes pull requests that do not reference a linked issue.
 - **Pull request template** ([`PULL_REQUEST_TEMPLATE.md`]): every PR must include a linked issue, Status, Description, and the Type of Change checklist.
@@ -429,5 +429,6 @@ Users should install `explicit` via `dart pub add explicit` — the outcome prim
 [very_good_analysis_link]: https://pub.dev/packages/very_good_analysis
 [issue_tracker_link]: https://github.com/danxorzum/explicit/issues
 [dependabot.yaml]: https://github.com/danxorzum/explicit/blob/main/.github/dependabot.yaml
+[release_version_pr.yaml]: https://github.com/danxorzum/explicit/blob/main/.github/workflows/release_version_pr.yaml
 [issue_first.yaml]: https://github.com/danxorzum/explicit/blob/main/.github/workflows/issue_first.yaml
 [PULL_REQUEST_TEMPLATE.md]: https://github.com/danxorzum/explicit/blob/main/.github/PULL_REQUEST_TEMPLATE.md
