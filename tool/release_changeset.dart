@@ -498,9 +498,7 @@ Future<void> _handleValidateRelease(List<String> args) async {
       '$workspaceRoot/packages/${tagInfo.packageName}/pubspec.yaml';
   final pubspecFile = File(pubspecPath);
   if (!pubspecFile.existsSync()) {
-    stderr.writeln(
-      'ERROR: pubspec not found at $pubspecPath.',
-    );
+    stderr.writeln('ERROR: pubspec not found at $pubspecPath.');
     stdout.writeln(
       '{"isValid": false, '
       '"errors": ["pubspec not found for ${tagInfo.packageName}"], '
@@ -516,9 +514,7 @@ Future<void> _handleValidateRelease(List<String> args) async {
       '$workspaceRoot/packages/${tagInfo.packageName}/CHANGELOG.md';
   final changelogFile = File(changelogPath);
   if (!changelogFile.existsSync()) {
-    stderr.writeln(
-      'ERROR: CHANGELOG.md not found at $changelogPath.',
-    );
+    stderr.writeln('ERROR: CHANGELOG.md not found at $changelogPath.');
     stdout.writeln(
       '{"isValid": false, '
       '"errors": ["CHANGELOG.md not found for ${tagInfo.packageName}"], '
@@ -650,10 +646,11 @@ Future<List<ChangedFile>> _getGitDiffChangedFiles(
   String head,
 ) async {
   // Step 1: Get the list of changed file names.
-  final nameResult = await Process.run(
-    'git',
-    ['diff', '--name-only', '$base...$head'],
-  );
+  final nameResult = await Process.run('git', [
+    'diff',
+    '--name-only',
+    '$base...$head',
+  ]);
   if (nameResult.exitCode != 0) {
     stderr
       ..writeln('ERROR: git diff failed for range $base...$head.')
@@ -675,17 +672,19 @@ Future<List<ChangedFile>> _getGitDiffChangedFiles(
   // Step 2: Collect unified diff content per file for content-aware analysis.
   final changedFiles = <ChangedFile>[];
   for (final fileName in fileNames) {
-    final diffResult = await Process.run(
-      'git',
-      ['diff', '$base...$head', '--', fileName],
-    );
+    final diffResult = await Process.run('git', [
+      'diff',
+      '$base...$head',
+      '--',
+      fileName,
+    ]);
     final diffContent = diffResult.exitCode == 0
         ? (diffResult.stdout as String).trim()
         : null;
     changedFiles.add(
       ChangedFile(
         path: fileName,
-        diffContent: diffContent?.isNotEmpty == true ? diffContent : null,
+        diffContent: (diffContent?.isNotEmpty ?? false) ? diffContent : null,
       ),
     );
   }
@@ -700,10 +699,13 @@ Future<List<ChangedFile>> _getGitDiffChangedFiles(
 /// Throws on network or parse errors (fail-closed).
 PubDevMetadata _fetchPubDevMetadata(String packageName) {
   final url = 'https://pub.dev/api/packages/$packageName';
-  final result = Process.runSync(
-    'curl',
-    ['--silent', '--fail', '--max-time', '10', url],
-  );
+  final result = Process.runSync('curl', [
+    '--silent',
+    '--fail',
+    '--max-time',
+    '10',
+    url,
+  ]);
 
   if (result.exitCode != 0) {
     throw Exception(

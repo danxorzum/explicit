@@ -2,11 +2,14 @@ import 'dart:io';
 
 import 'package:test/test.dart';
 
+String get _packageRoot =>
+    Directory('packages/explicit').existsSync() ? 'packages/explicit' : '.';
+
 void main() {
   group('NullableToOpt analyzer contract', () {
     test('analyzer rejects nullable payload in toOpt result', () async {
       final fixture = File(
-        '${Directory.current.path}/test/src/outcome/utils/.nullable_to_opt_contract_fixture.dart',
+        '$_packageRoot/test/src/outcome/utils/.nullable_to_opt_contract_fixture.dart',
       );
       addTearDown(() async {
         if (fixture.existsSync()) await fixture.delete();
@@ -46,7 +49,7 @@ void main() {
 
     test('toOpt returns Opt with non-null payload type', () async {
       final fixture = File(
-        '${Directory.current.path}/test/src/outcome/utils/.to_opt_payload_contract_fixture.dart',
+        '$_packageRoot/test/src/outcome/utils/.to_opt_payload_contract_fixture.dart',
       );
       addTearDown(() async {
         if (fixture.existsSync()) await fixture.delete();

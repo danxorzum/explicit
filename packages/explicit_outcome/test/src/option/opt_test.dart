@@ -3,6 +3,10 @@ import 'dart:io';
 import 'package:explicit_outcome/explicit_outcome.dart';
 import 'package:test/test.dart';
 
+String get _packageRoot => Directory('packages/explicit_outcome').existsSync()
+    ? 'packages/explicit_outcome'
+    : '.';
+
 typedef _OptCase = ({
   String name,
   Opt<int> option,
@@ -114,7 +118,7 @@ void main() {
 
     test('analyzer rejects nullable payload contracts', () async {
       final fixture = File(
-        '${Directory.current.path}/test/src/option/.nullable_contract_fixture.dart',
+        '$_packageRoot/test/src/option/.nullable_contract_fixture.dart',
       );
       addTearDown(() async {
         if (fixture.existsSync()) await fixture.delete();
@@ -146,7 +150,8 @@ void main() {
       expect(source, contains('Val(null)'));
       expect(output, contains('Opt<String?>'));
       expect(output, contains('Option<String?>'));
-      expect(output, contains("The argument type 'Null'"));
+      expect(output, contains('type_argument_not_matching_bounds'));
+      expect(output, contains("'Null' doesn't conform to the bound 'Object'"));
     });
   });
 }

@@ -2,7 +2,7 @@
 
 [![style: very good analysis][very_good_analysis_badge]][very_good_analysis_link]
 [![License: MPL-2.0][license_badge]][license_link]
-[![Dart 3.12+][dart_badge]][dart_link]
+[![Dart 3.6+][dart_badge]][dart_link]
 
 Typed outcomes for explicit, predictable Dart development.
 
@@ -220,12 +220,12 @@ final result = await pipeline.run(); // Res<int, String>
 
 ## Compatibility
 
-- **Dart SDK:** `^3.12.0` (sealed classes, pattern matching, records).
+- **Dart SDK:** `>=3.6.0 <4.0.0` (sealed classes, pattern matching, records).
 - **License:** [Mozilla Public License 2.0][license_link] (MPL-2.0).
 
 [license_badge]: https://img.shields.io/badge/license-MPL_2.0-blue.svg
 [license_link]: https://opensource.org/licenses/MPL-2.0
-[dart_badge]: https://img.shields.io/badge/dart-%5E3.12.0-blue.svg
+[dart_badge]: https://img.shields.io/badge/dart-%3E%3D3.6.0%20%3C4.0.0-blue.svg
 [dart_link]: https://dart.dev/get-dart
 [very_good_analysis_badge]: https://img.shields.io/badge/style-very_good_analysis-B22C89.svg
 [very_good_analysis_link]: https://pub.dev/packages/very_good_analysis

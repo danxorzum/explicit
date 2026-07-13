@@ -3,6 +3,10 @@ import 'dart:io';
 import 'package:explicit_outcome/explicit_outcome.dart';
 import 'package:test/test.dart';
 
+String get _packageRoot => Directory('packages/explicit_outcome').existsSync()
+    ? 'packages/explicit_outcome'
+    : '.';
+
 typedef _ResultCase = ({
   String name,
   Result<int, String> input,
@@ -137,8 +141,8 @@ void main() {
         name: 'next can chain Ok to Err',
         input: const Ok<int, String>(0),
         act: (result) => result.next(
-          (_) => const Err<int, String>('zero is invalid'),
-        ),
+              (_) => const Err<int, String>('zero is invalid'),
+            ),
         expectedValue: null,
         expectedError: 'zero is invalid',
       ),
@@ -146,8 +150,8 @@ void main() {
         name: 'next short-circuits Err without running the callback',
         input: const Err<int, String>('original'),
         act: (result) => result.next(
-          (_) => throw StateError('must not run'),
-        ),
+              (_) => throw StateError('must not run'),
+            ),
         expectedValue: null,
         expectedError: 'original',
       ),
@@ -155,8 +159,8 @@ void main() {
         name: 'mapError preserves Ok values without running the callback',
         input: const Ok<int, String>(42),
         act: (result) => result.mapError(
-          (_) => throw StateError('must not run'),
-        ),
+              (_) => throw StateError('must not run'),
+            ),
         expectedValue: 42,
         expectedError: null,
       ),
@@ -303,7 +307,7 @@ void main() {
 
     test('analyzer rejects nullable generic contracts', () async {
       final fixture = File(
-        '${Directory.current.path}/test/src/result/.nullable_contract_fixture.dart',
+        '$_packageRoot/test/src/result/.nullable_contract_fixture.dart',
       );
       addTearDown(() async {
         if (fixture.existsSync()) await fixture.delete();
@@ -337,7 +341,8 @@ void main() {
       expect(source, contains('Err(null)'));
       expect(output, contains('Result<int?, String>'));
       expect(output, contains('Res<int, String?>'));
-      expect(output, contains("The argument type 'Null'"));
+      expect(output, contains('type_argument_not_matching_bounds'));
+      expect(output, contains("'Null' doesn't conform to the bound 'Object'"));
     });
   });
 

@@ -2,6 +2,9 @@ import 'dart:io';
 
 import 'package:test/test.dart';
 
+String get _packageRoot =>
+    Directory('packages/explicit').existsSync() ? 'packages/explicit' : '.';
+
 typedef _FileCase = ({
   String name,
   String path,
@@ -45,7 +48,7 @@ void main() {
 
     for (final tc in testCases) {
       test(tc.name, () {
-        final file = File(tc.path);
+        final file = File('$_packageRoot/${tc.path}');
 
         expect(file.existsSync(), isTrue, reason: '${tc.path} must exist');
         expect(file.readAsStringSync(), contains(tc.expectedContent));

@@ -7,6 +7,9 @@ import 'dart:io';
 import 'package:explicit/explicit.dart';
 import 'package:test/test.dart';
 
+String get _packageRoot =>
+    Directory('packages/explicit').existsSync() ? 'packages/explicit' : '.';
+
 void main() {
   group('ParallelRes2', () {
     test('no eager execution before run()', () {
@@ -261,9 +264,9 @@ void main() {
       var totalCalls = 0;
 
       AsyncRes<int, String> makeRecipe() => AsyncRes<int, String>(() async {
-        totalCalls++;
-        return Ok(totalCalls);
-      });
+            totalCalls++;
+            return Ok(totalCalls);
+          });
 
       final combinator = ParallelRes4(
         makeRecipe(),
@@ -318,9 +321,9 @@ void main() {
       var callCount = 0;
 
       AsyncRes<int, String> makeRecipe() => AsyncRes<int, String>(() async {
-        callCount++;
-        return const Ok(1);
-      });
+            callCount++;
+            return const Ok(1);
+          });
 
       ParallelRes5(
         makeRecipe(),
@@ -337,7 +340,7 @@ void main() {
   group('Static analysis contracts', () {
     test('analyzer rejects function-style parallelRes2..5 calls', () async {
       final fixture = File(
-        '${Directory.current.path}/test/src/outcome/utils/.parallel_res_function_style_fixture.dart',
+        '$_packageRoot/test/src/outcome/utils/.parallel_res_function_style_fixture.dart',
       );
       addTearDown(() async {
         if (fixture.existsSync()) await fixture.delete();
@@ -386,7 +389,7 @@ void main() {
       'analyzer rejects eager Future passed to ParallelRes2 constructor',
       () async {
         final fixture = File(
-          '${Directory.current.path}/test/src/outcome/utils/.parallel_res_eager_future_fixture.dart',
+          '$_packageRoot/test/src/outcome/utils/.parallel_res_eager_future_fixture.dart',
         );
         addTearDown(() async {
           if (fixture.existsSync()) await fixture.delete();
@@ -421,8 +424,7 @@ void main() {
         expect(
           result.exitCode,
           isNot(0),
-          reason:
-              'Analyzer must reject Future<Res<T, E>> '
+          reason: 'Analyzer must reject Future<Res<T, E>> '
               'where AsyncRes<T, E> is required',
         );
         expect(
