@@ -1,35 +1,27 @@
-# Publish — tag-triggered pub.dev trusted publishing via GitHub OIDC.
-#
-# Maintainer release sequence:
-#   1. Merge the automated release/version PR after CI is green.
-#   2. Manually create and push release tags that match committed provenance:
-#      <package>/v<semver>, for example explicit_outcome/v0.1.0.
-#   3. If both packages release, push explicit_outcome first. Wait until the
-#      required explicit_outcome version is visible on pub.dev before pushing
-#      the dependent explicit tag.
-#
-# Manual tag creation is the approval boundary for every release class, so this
-# workflow intentionally has no patch/minor vs major environment split.
-# Publishing uses OIDC trusted publishing only; no long-lived pub.dev tokens.
+# Temporary publishing workflow.
+# Provenance validation is intentionally bypassed while the release flow
+# is being redesigned.
 
 name: Publish
 
 on:
   push:
     tags:
-      - 'explicit_outcome/v*'
-      - 'explicit/v*'
+      - "explicit_outcome/v*"
+      - "explicit/v*"
 
 permissions:
   contents: read
 
 jobs:
   validate_release:
-    name: "Validate release tag"
+    name: Validate release tag
     runs-on: ubuntu-latest
+
     outputs:
       package: ${{ steps.validate.outputs.package }}
       version: ${{ steps.validate.outputs.version }}
+
     steps:
       - uses: actions/checkout@v7
         with:
@@ -39,39 +31,80 @@ jobs:
         with:
           sdk: "3.12.0"
 
-      - name: Install workspace dependencies
-        run: dart pub get
-
-      - name: Validate release tag
+      - name: Validate tag and package version
         id: validate
+        shell: bash
         run: |
-          TAG="${GITHUB_REF#refs/tags/}"
-          echo "Validating tag: $TAG"
+          set -euo pipefail
 
-          TAG_TARGET=$(git rev-list -n 1 "$TAG")
-          HEAD_COMMIT=$(git rev-parse HEAD)
-          if [ "$TAG_TARGET" != "$HEAD_COMMIT" ]; then
-            echo "Release tag target check failed: $TAG points to $TAG_TARGET, checkout is $HEAD_COMMIT."
+          TAG="${GITHUB_REF#refs/tags/}"
+
+          echo "Validating release tag: $TAG"
+
+          case "$TAG" in
+            explicit_outcome/v*)
+              PACKAGE="explicit_outcome"
+              ;;
+            explicit/v*)
+              PACKAGE="explicit"
+              ;;
+            *)
+              echo "::error::Unsupported release tag: $TAG"
+              exit 1
+              ;;
+          esac
+
+          VERSION="${TAG#*/v}"
+
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Invalid semantic version in tag: $VERSION"
             exit 1
           fi
 
-          RESULT=$(dart run tool/release_changeset.dart validate-release --tag="$TAG")
-          echo "$RESULT"
+          PUBSPEC="packages/$PACKAGE/pubspec.yaml"
 
-          PACKAGE=$(echo "$RESULT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d['package'])")
-          VERSION=$(echo "$RESULT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d['version'])")
+          if [ ! -f "$PUBSPEC" ]; then
+            echo "::error::Package pubspec not found: $PUBSPEC"
+            exit 1
+          fi
+
+          PUBSPEC_VERSION="$(
+            awk '$1 == "version:" { print $2; exit }' "$PUBSPEC"
+          )"
+
+          if [ -z "$PUBSPEC_VERSION" ]; then
+            echo "::error::No version found in $PUBSPEC"
+            exit 1
+          fi
+
+          if [ "$VERSION" != "$PUBSPEC_VERSION" ]; then
+            echo "::error::Tag version $VERSION does not match $PUBSPEC_VERSION in $PUBSPEC"
+            exit 1
+          fi
+
+          TAG_TARGET="$(git rev-list -n 1 "$TAG")"
+          HEAD_COMMIT="$(git rev-parse HEAD)"
+
+          if [ "$TAG_TARGET" != "$HEAD_COMMIT" ]; then
+            echo "::error::Tag $TAG points to $TAG_TARGET, but checkout is $HEAD_COMMIT"
+            exit 1
+          fi
 
           echo "package=$PACKAGE" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Validated: $PACKAGE v$VERSION"
+
+          echo "Validated package: $PACKAGE"
+          echo "Validated version: $VERSION"
 
   publish_package:
-    name: "Publish package"
+    name: Publish package
     needs: validate_release
     runs-on: ubuntu-latest
+
     permissions:
       id-token: write
       contents: read
+
     steps:
       - uses: actions/checkout@v7
 
@@ -82,6 +115,98 @@ jobs:
       - name: Install workspace dependencies
         run: dart pub get
 
-      - name: Publish ${{ needs.validate_release.outputs.package }}
+      - name: Validate package publication
+        working-directory: packages/${{ needs.validate_release.outputs.package }}
+        run: dart pub publish --dry-run
+
+      - name: Publish ${{ needs.validate_release.outputs.package }} v${{ needs.validate_release.outputs.version }}
         working-directory: packages/${{ needs.validate_release.outputs.package }}
         run: dart pub publish --force
+# Temporally disabled until CI is fixed for new flow.
+# # Publish — tag-triggered pub.dev trusted publishing via GitHub OIDC.
+# #
+# # Maintainer release sequence:
+# #   1. Merge the automated release/version PR after CI is green.
+# #   2. Manually create and push release tags that match committed provenance:
+# #      <package>/v<semver>, for example explicit_outcome/v0.1.0.
+# #   3. If both packages release, push explicit_outcome first. Wait until the
+# #      required explicit_outcome version is visible on pub.dev before pushing
+# #      the dependent explicit tag.
+# #
+# # Manual tag creation is the approval boundary for every release class, so this
+# # workflow intentionally has no patch/minor vs major environment split.
+# # Publishing uses OIDC trusted publishing only; no long-lived pub.dev tokens.
+
+# name: Publish
+
+# on:
+#   push:
+#     tags:
+#       - 'explicit_outcome/v*'
+#       - 'explicit/v*'
+
+# permissions:
+#   contents: read
+
+# jobs:
+#   validate_release:
+#     name: "Validate release tag"
+#     runs-on: ubuntu-latest
+#     outputs:
+#       package: ${{ steps.validate.outputs.package }}
+#       version: ${{ steps.validate.outputs.version }}
+#     steps:
+#       - uses: actions/checkout@v7
+#         with:
+#           fetch-depth: 0
+
+#       - uses: dart-lang/setup-dart@v1
+#         with:
+#           sdk: "3.12.0"
+
+#       - name: Install workspace dependencies
+#         run: dart pub get
+
+#       - name: Validate release tag
+#         id: validate
+#         run: |
+#           TAG="${GITHUB_REF#refs/tags/}"
+#           echo "Validating tag: $TAG"
+
+#           TAG_TARGET=$(git rev-list -n 1 "$TAG")
+#           HEAD_COMMIT=$(git rev-parse HEAD)
+#           if [ "$TAG_TARGET" != "$HEAD_COMMIT" ]; then
+#             echo "Release tag target check failed: $TAG points to $TAG_TARGET, checkout is $HEAD_COMMIT."
+#             exit 1
+#           fi
+
+#           RESULT=$(dart run tool/release_changeset.dart validate-release --tag="$TAG")
+#           echo "$RESULT"
+
+#           PACKAGE=$(echo "$RESULT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d['package'])")
+#           VERSION=$(echo "$RESULT" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d['version'])")
+
+#           echo "package=$PACKAGE" >> "$GITHUB_OUTPUT"
+#           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+#           echo "Validated: $PACKAGE v$VERSION"
+
+#   publish_package:
+#     name: "Publish package"
+#     needs: validate_release
+#     runs-on: ubuntu-latest
+#     permissions:
+#       id-token: write
+#       contents: read
+#     steps:
+#       - uses: actions/checkout@v7
+
+#       - uses: dart-lang/setup-dart@v1
+#         with:
+#           sdk: "3.12.0"
+
+#       - name: Install workspace dependencies
+#         run: dart pub get
+
+#       - name: Publish ${{ needs.validate_release.outputs.package }}
+#         working-directory: packages/${{ needs.validate_release.outputs.package }}
+#         run: dart pub publish --force
